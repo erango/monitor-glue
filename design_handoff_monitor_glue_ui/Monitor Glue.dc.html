@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","SF Pro Display","Helvetica Neue",Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;}
+  :root{
+    --stage-bg:radial-gradient(140% 130% at 50% -10%, #eef2f8 0%, #dde4ef 52%, #c9d2e1 100%);
+    --win-bg:#ECECEE; --content-bg:#FFFFFF; --list-bg:#F3F3F5;
+    --titlebar:linear-gradient(180deg,#f7f7f8,#ededef);
+    --win-edge:rgba(0,0,0,0.14);
+    --label:rgba(0,0,0,0.86); --secondary:rgba(0,0,0,0.5); --tertiary:rgba(0,0,0,0.32);
+    --separator:rgba(0,0,0,0.10); --fill:rgba(0,0,0,0.045); --fill-2:rgba(0,0,0,0.08);
+    --accent:#0A6CF5; --green:#1E9E45; --orange:#C26A06; --red:#D7372C;
+    --warn-bg:rgba(255,159,10,0.10); --warn-edge:rgba(194,106,6,0.32);
+    --menubar-strip:rgba(248,248,250,0.74); --menubar-active:rgba(0,0,0,0.08);
+    --popover-bg:rgba(247,247,249,0.80); --card-shadow:0 1px 2.5px rgba(0,0,0,0.07);
+  }
+  [data-theme="dark"]{
+    --stage-bg:radial-gradient(140% 130% at 50% -10%, #21252f 0%, #14171e 54%, #0b0d11 100%);
+    --win-bg:#2B2B2E; --content-bg:#1E1E20; --list-bg:#161618;
+    --titlebar:linear-gradient(180deg,#323236,#28282b);
+    --win-edge:rgba(255,255,255,0.10);
+    --label:rgba(255,255,255,0.92); --secondary:rgba(255,255,255,0.55); --tertiary:rgba(255,255,255,0.34);
+    --separator:rgba(255,255,255,0.10); --fill:rgba(255,255,255,0.07); --fill-2:rgba(255,255,255,0.12);
+    --accent:#0A84FF; --green:#30D158; --orange:#FF9F0A; --red:#FF453A;
+    --warn-bg:rgba(255,159,10,0.13); --warn-edge:rgba(255,159,10,0.34);
+    --menubar-strip:rgba(28,28,30,0.62); --menubar-active:rgba(255,255,255,0.16);
+    --popover-bg:rgba(41,41,44,0.78); --card-shadow:0 1px 2.5px rgba(0,0,0,0.45);
+  }
+  @keyframes mgPop{from{opacity:0;transform:translateY(-5px) scale(.985);}to{opacity:1;transform:none;}}
+  @keyframes mgFade{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:none;}}
+</style>
+</helmet>
+
+<div style="--stage-bg:radial-gradient(140% 130% at 50% -10%, #eef2f8 0%, #dde4ef 52%, #c9d2e1 100%);--win-bg:#ECECEE;--content-bg:#FFFFFF;--list-bg:#F3F3F5;--titlebar:linear-gradient(180deg,#f7f7f8,#ededef);--win-edge:rgba(0,0,0,0.14);--label:rgba(0,0,0,0.86);--secondary:rgba(0,0,0,0.5);--tertiary:rgba(0,0,0,0.32);--separator:rgba(0,0,0,0.10);--fill:rgba(0,0,0,0.045);--fill-2:rgba(0,0,0,0.08);--accent:#0A6CF5;--green:#1E9E45;--orange:#C26A06;--red:#D7372C;--warn-bg:rgba(255,159,10,0.10);--warn-edge:rgba(194,106,6,0.32);--menubar-strip:rgba(248,248,250,0.74);--menubar-active:rgba(0,0,0,0.08);--popover-bg:rgba(247,247,249,0.80);--card-shadow:0 1px 2.5px rgba(0,0,0,0.07);min-height:100vh;background:#161618;">
+<div data-theme="{{ appearance }}" style="min-height:100vh;display:flex;flex-direction:column;background:#161618;color:var(--label);">
+
+  <header style="position:sticky;top:0;z-index:30;background:linear-gradient(180deg,#27272a,#1b1b1e);border-bottom:0.5px solid rgba(255,255,255,0.09);">
+    <div style="max-width:1080px;margin:0 auto;padding:13px 22px 0;">
+      <div style="display:flex;align-items:center;gap:13px;">
+        <div style="width:30px;height:30px;border-radius:8px;background:linear-gradient(160deg,#3a8bff,#1457d8);display:flex;align-items:center;justify-content:center;color:#fff;box-shadow:0 1px 3px rgba(0,0,0,0.4),inset 0 0.5px 0 rgba(255,255,255,0.45);">
+          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" style="display:block"><rect x="2.6" y="3.4" width="18.8" height="13" rx="2.3" stroke="currentColor" stroke-width="1.7"></rect><path d="M9 20.4h6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"></path><path d="M12 16.4v4" stroke="currentColor" stroke-width="1.7"></path><circle cx="12" cy="8.6" r="2.3" fill="currentColor"></circle><path d="M12 10.9v3.1" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"></path></svg>
+        </div>
+        <div style="display:flex;flex-direction:column;line-height:1.18;">
+          <span style="color:#fff;font-size:14.5px;font-weight:600;letter-spacing:-0.01em;">Monitor Glue</span>
+          <span style="color:rgba(255,255,255,0.45);font-size:11.5px;">macOS menu-bar utility · SwiftUI surfaces</span>
+        </div>
+        <div style="margin-left:auto;display:flex;align-items:center;gap:8px;">
+          <span style="color:rgba(255,255,255,0.4);font-size:10px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;">Appearance</span>
+          <div style="display:inline-flex;gap:2px;padding:2px;background:rgba(255,255,255,0.07);border-radius:9px;">
+            <sc-for list="{{ appearanceTabs }}" as="t" hint-placeholder-count="2"><button onClick="{{ t.onClick }}" style="{{ t.style }}">{{ t.label }}</button></sc-for>
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:16px;padding:13px 0;flex-wrap:wrap;">
+        <div style="display:inline-flex;gap:2px;padding:2px;background:rgba(255,255,255,0.07);border-radius:9px;">
+          <sc-for list="{{ surfaceTabs }}" as="t" hint-placeholder-count="4"><button onClick="{{ t.onClick }}" style="{{ t.style }}">{{ t.label }}</button></sc-for>
+        </div>
+        <div style="margin-left:auto;display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
+          <sc-if value="{{ isMenubar }}" hint-placeholder-val="{{ true }}">
+            <div style="display:flex;align-items:center;gap:8px;"><span style="color:rgba(255,255,255,0.4);font-size:10px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;">State</span><div style="display:inline-flex;gap:2px;padding:2px;background:rgba(255,255,255,0.07);border-radius:9px;"><sc-for list="{{ stateTabs }}" as="t" hint-placeholder-count="2"><button onClick="{{ t.onClick }}" style="{{ t.style }}">{{ t.label }}</button></sc-for></div></div>
+          </sc-if>
+          <sc-if value="{{ isManager }}">
+            <div style="display:flex;align-items:center;gap:8px;"><span style="color:rgba(255,255,255,0.4);font-size:10px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;">View</span><div style="display:inline-flex;gap:2px;padding:2px;background:rgba(255,255,255,0.07);border-radius:9px;"><sc-for list="{{ mgrVarTabs }}" as="t" hint-placeholder-count="3"><button onClick="{{ t.onClick }}" style="{{ t.style }}">{{ t.label }}</button></sc-for></div></div>
+            <div style="display:flex;align-items:center;gap:8px;"><span style="color:rgba(255,255,255,0.4);font-size:10px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;">State</span><div style="display:inline-flex;gap:2px;padding:2px;background:rgba(255,255,255,0.07);border-radius:9px;"><sc-for list="{{ stateTabs }}" as="t" hint-placeholder-count="2"><button onClick="{{ t.onClick }}" style="{{ t.style }}">{{ t.label }}</button></sc-for></div></div>
+          </sc-if>
+          <sc-if value="{{ isOnboarding }}">
+            <div style="display:flex;align-items:center;gap:8px;"><span style="color:rgba(255,255,255,0.4);font-size:10px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;">Layout</span><div style="display:inline-flex;gap:2px;padding:2px;background:rgba(255,255,255,0.07);border-radius:9px;"><sc-for list="{{ obVarTabs }}" as="t" hint-placeholder-count="2"><button onClick="{{ t.onClick }}" style="{{ t.style }}">{{ t.label }}</button></sc-for></div></div>
+          </sc-if>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main style="flex:1;background:var(--stage-bg);padding:46px 24px 72px;display:flex;flex-direction:column;align-items:center;">
+
+    <!-- ============ MENU BAR ============ -->
+    <sc-if value="{{ isMenubar }}" hint-placeholder-val="{{ true }}">
+    <div style="display:flex;flex-direction:column;align-items:flex-end;width:360px;">
+      <div style="width:100%;display:flex;justify-content:flex-end;align-items:center;gap:14px;height:24px;padding:0 12px;border-radius:7px;background:var(--menubar-strip);backdrop-filter:saturate(140%) blur(20px);-webkit-backdrop-filter:saturate(140%) blur(20px);box-shadow:0 0 0 0.5px var(--win-edge);color:var(--label);margin-bottom:9px;">
+        <span style="opacity:.5;display:flex;"><svg viewBox="0 0 24 24" width="15" height="15" fill="none"><path d="M3 9.5a13 13 0 0 1 18 0M6 13a8.5 8.5 0 0 1 12 0M9 16.4a4 4 0 0 1 6 0" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"></path><circle cx="12" cy="19.6" r="1" fill="currentColor"></circle></svg></span>
+        <span style="opacity:.5;display:flex;"><svg viewBox="0 0 26 24" width="17" height="15" fill="none"><rect x="1.5" y="8" width="19" height="9" rx="2.6" stroke="currentColor" stroke-width="1.6"></rect><rect x="3.4" y="9.9" width="13" height="5.2" rx="1.2" fill="currentColor"></rect><path d="M22.5 11v3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path></svg></span>
+        <span style="display:flex;align-items:center;justify-content:center;width:22px;height:18px;border-radius:5px;background:var(--menubar-active);color:var(--label);"><svg viewBox="0 0 24 24" width="14" height="14" fill="none"><rect x="2.6" y="3.4" width="18.8" height="13" rx="2.3" stroke="currentColor" stroke-width="1.8"></rect><path d="M9 20.4h6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path><path d="M12 16.4v4" stroke="currentColor" stroke-width="1.8"></path><circle cx="12" cy="8.6" r="2.3" fill="currentColor"></circle><path d="M12 10.9v3.1" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path></svg></span>
+        <span style="font-size:12.5px;font-weight:500;opacity:.85;">Mon Jun 29&nbsp;&nbsp;9:41 AM</span>
+      </div>
+
+      <div style="width:0;height:0;border-left:8px solid transparent;border-right:8px solid transparent;border-bottom:9px solid var(--popover-bg);margin-right:88px;"></div>
+
+      <div style="width:320px;background:var(--popover-bg);backdrop-filter:saturate(180%) blur(30px);-webkit-backdrop-filter:saturate(180%) blur(30px);border-radius:12px;box-shadow:0 18px 50px rgba(0,0,0,0.32),0 0 0 0.5px var(--win-edge);padding:12px;color:var(--label);">
+
+        <div style="display:flex;align-items:center;gap:8px;padding:2px 4px 0;">
+          <span style="color:var(--accent);display:flex;"><svg viewBox="0 0 24 24" width="16" height="16" fill="none"><rect x="2.6" y="3.4" width="18.8" height="13" rx="2.3" stroke="currentColor" stroke-width="1.8"></rect><path d="M9 20.4h6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path><path d="M12 16.4v4" stroke="currentColor" stroke-width="1.8"></path><circle cx="12" cy="8.6" r="2.3" fill="currentColor"></circle><path d="M12 10.9v3.1" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path></svg></span>
+          <span style="font-weight:600;font-size:15px;letter-spacing:-0.01em;">Monitor Glue</span>
+        </div>
+
+        <div style="height:0.5px;background:var(--separator);margin:10px 0;"></div>
+
+        <sc-if value="{{ granted }}">
+          <div style="display:flex;gap:9px;padding:1px 4px;">
+            <span style="color:var(--green);margin-top:1px;display:flex;"><svg viewBox="0 0 16 16" width="15" height="15"><circle cx="8" cy="8" r="7" fill="currentColor"></circle><path d="M5 8.2 7 10.2 11 5.8" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path></svg></span>
+            <div>
+              <div style="font-size:13px;font-weight:570;">Tracking · 2 displays connected</div>
+              <div style="font-size:11.5px;color:var(--secondary);margin-top:2px;">Dell U2720Q + LG HDR 4K · 5 windows</div>
+              <div style="font-size:11.5px;color:var(--tertiary);margin-top:1px;">2 monitor sets · 8 windows remembered</div>
+            </div>
+          </div>
+        </sc-if>
+        <sc-if value="{{ notGranted }}">
+          <div style="background:var(--warn-bg);border:0.5px solid var(--warn-edge);border-radius:9px;padding:10px;display:flex;flex-direction:column;gap:7px;">
+            <div style="display:flex;gap:7px;align-items:center;color:var(--orange);font-size:13px;font-weight:600;"><svg viewBox="0 0 16 16" width="15" height="15"><path d="M8 1.9 14.6 13.3 H1.4 Z" fill="currentColor"></path><path d="M8 6.1v3.5" stroke="#fff" stroke-width="1.5" stroke-linecap="round"></path><circle cx="8" cy="11.4" r="0.95" fill="#fff"></circle></svg>Accessibility access required</div>
+            <div style="font-size:11.5px;color:var(--secondary);line-height:1.42;">Monitor Glue needs Accessibility access to read and move app windows.</div>
+            <button style="appearance:none;border:none;margin:1px 0 0;font-family:inherit;background:var(--accent);color:#fff;font-size:12.5px;font-weight:560;padding:6px 12px;border-radius:7px;cursor:pointer;align-self:flex-start;" style-hover="filter:brightness(1.07);">Grant access…</button>
+          </div>
+        </sc-if>
+
+        <div style="height:0.5px;background:var(--separator);margin:10px 0;"></div>
+
+        <sc-if value="{{ granted }}">
+          <button style="appearance:none;border:none;margin:0;font-family:inherit;background:transparent;display:flex;align-items:center;gap:9px;width:100%;padding:6px 8px;border-radius:6px;font-size:13px;font-weight:500;color:var(--label);cursor:pointer;text-align:left;" style-hover="background:var(--accent);color:#fff;">
+            <span style="display:flex;width:17px;justify-content:center;"><svg viewBox="0 0 16 16" width="14" height="14" fill="none"><path d="M5.5 4 2.4 7.1 5.5 10.2 M2.7 7.1H9.6a3.6 3.6 0 0 1 0 7.2H6.2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"></path></svg></span>
+            Restore windows now <span style="margin-left:auto;font-size:11px;opacity:.55;">⌘R</span>
+          </button>
+        </sc-if>
+        <sc-if value="{{ notGranted }}">
+          <div style="display:flex;align-items:center;gap:9px;width:100%;padding:6px 8px;border-radius:6px;font-size:13px;color:var(--tertiary);cursor:default;">
+            <span style="display:flex;width:17px;justify-content:center;"><svg viewBox="0 0 16 16" width="14" height="14" fill="none"><path d="M5.5 4 2.4 7.1 5.5 10.2 M2.7 7.1H9.6a3.6 3.6 0 0 1 0 7.2H6.2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"></path></svg></span>
+            Restore windows now <span style="margin-left:auto;font-size:11px;opacity:.7;">⌘R</span>
+          </div>
+        </sc-if>
+
+        <button onClick="{{ openManager }}" style="appearance:none;border:none;margin:0;font-family:inherit;background:transparent;display:flex;align-items:center;gap:9px;width:100%;padding:6px 8px;border-radius:6px;font-size:13px;color:var(--label);cursor:pointer;text-align:left;" style-hover="background:var(--accent);color:#fff;">
+          <span style="display:flex;width:17px;justify-content:center;"><svg viewBox="0 0 16 16" width="14" height="14" fill="none"><rect x="2.4" y="5.6" width="11.2" height="7.4" rx="1.5" stroke="currentColor" stroke-width="1.3"></rect><path d="M4.6 3.6h6.8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"></path></svg></span>
+          Open Manager…
+        </button>
+
+        <div style="height:0.5px;background:var(--separator);margin:10px 0;"></div>
+
+        <button style="appearance:none;border:none;margin:0;font-family:inherit;background:transparent;display:flex;align-items:center;gap:9px;width:100%;padding:6px 8px;border-radius:6px;font-size:13px;color:var(--label);cursor:pointer;text-align:left;" style-hover="background:var(--accent);color:#fff;">
+          <span style="display:flex;width:17px;justify-content:center;"><svg viewBox="0 0 16 16" width="14" height="14" fill="none"><path d="M8 2.4v5.2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path><path d="M4.9 4.5a4.6 4.6 0 1 0 6.2 0" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path></svg></span>
+          Quit Monitor Glue <span style="margin-left:auto;font-size:11px;opacity:.55;">⌘Q</span>
+        </button>
+
+        <div style="height:0.5px;background:var(--separator);margin:10px 0 9px;"></div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:9px;padding:0 4px 3px;">
+          <div style="font-size:11.5px;color:var(--secondary);">Made with <span style="color:#FF5A5F;">♥</span> by <a href="https://github.com/erango" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none;font-weight:570;" style-hover="text-decoration:underline;">@erango</a></div>
+          <a href="https://ko-fi.com/erango" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:7px;text-decoration:none;background:#29ABE0;color:#fff;font-size:12px;font-weight:600;letter-spacing:-0.01em;padding:6px 14px;border-radius:9px;box-shadow:0 1px 3px rgba(0,0,0,0.2);" style-hover="filter:brightness(1.06);">
+            <svg viewBox="0 0 24 24" width="17" height="16" fill="none" style="display:block"><path d="M5 9h11v4.5a4.5 4.5 0 0 1-4.5 4.5h-2A4.5 4.5 0 0 1 5 13.5V9Z" fill="#fff"></path><path d="M16 10.2h1.6a2.4 2.4 0 0 1 0 4.8H16" stroke="#fff" stroke-width="1.5"></path><path d="M4 20.4h13" stroke="#fff" stroke-width="1.6" stroke-linecap="round"></path><path d="M8.6 6.6c0-1 .8-1.3.8-2.3M11.9 6.6c0-1 .8-1.3.8-2.3" stroke="#fff" stroke-width="1.4" stroke-linecap="round" opacity=".85"></path><path d="M9.1 11.1c.5-.7 1.6-.5 1.6.4 0 .9-1.6 1.9-1.6 1.9s-1.6-1-1.6-1.9c0-.9 1.1-1.1 1.6-.4Z" fill="#FF5A5F"></path></svg>
+            Buy me a coffee
+          </a>
+        </div>
+      </div>
+
+      <div style="width:320px;margin-top:18px;color:var(--secondary);font-size:11.5px;line-height:1.5;text-align:right;opacity:.85;">Popover · MenuBarExtra · ~320pt wide.<br>Toggle <strong style="color:var(--label);font-weight:600;">State</strong> above to see the Accessibility-permission state.</div>
+    </div>
+    </sc-if>
+
+    <!-- ============ MANAGER ============ -->
+    <sc-if value="{{ isManager }}">
+    <div style="width:760px;max-width:100%;height:548px;background:var(--win-bg);border-radius:11px;overflow:hidden;box-shadow:0 28px 64px rgba(0,0,0,0.34),0 0 0 0.5px var(--win-edge),0 2px 6px rgba(0,0,0,0.12);display:flex;flex-direction:column;color:var(--label);">
+      <!-- toolbar -->
+      <div style="display:flex;align-items:center;gap:13px;height:56px;padding:0 16px;background:var(--titlebar);border-bottom:0.5px solid var(--separator);flex-shrink:0;">
+        <div style="display:flex;gap:8px;">
+          <span style="width:12px;height:12px;border-radius:50%;background:#FF5F57;box-shadow:inset 0 0 0 0.5px rgba(0,0,0,0.12);"></span>
+          <span style="width:12px;height:12px;border-radius:50%;background:#FEBC2E;box-shadow:inset 0 0 0 0.5px rgba(0,0,0,0.12);"></span>
+          <span style="width:12px;height:12px;border-radius:50%;background:#28C840;box-shadow:inset 0 0 0 0.5px rgba(0,0,0,0.12);"></span>
+        </div>
+        <div style="display:flex;flex-direction:column;line-height:1.2;margin-left:4px;">
+          <span style="font-size:15px;font-weight:600;letter-spacing:-0.01em;">Remembered Monitors</span>
+          <sc-if value="{{ granted }}"><span style="font-size:11px;color:var(--green);">Accessibility access granted</span></sc-if>
+          <sc-if value="{{ notGranted }}"><span style="font-size:11px;color:var(--orange);">Accessibility access needed</span></sc-if>
+        </div>
+        <div style="margin-left:auto;display:flex;align-items:center;gap:8px;">
+          <sc-if value="{{ notGranted }}">
+            <button style="appearance:none;border:none;margin:0;font-family:inherit;background:var(--accent);color:#fff;display:inline-flex;align-items:center;gap:5px;font-size:12.5px;font-weight:560;padding:5px 11px;border-radius:7px;cursor:pointer;" style-hover="filter:brightness(1.07);">Grant Access…</button>
+          </sc-if>
+          <sc-if value="{{ hasSets }}">
+          <button style="appearance:none;margin:0;font-family:inherit;background:var(--fill);color:var(--red);display:inline-flex;align-items:center;gap:5px;font-size:12.5px;font-weight:500;padding:5px 11px;border-radius:7px;box-shadow:0 0 0 0.5px var(--win-edge);cursor:pointer;border:none;" style-hover="background:var(--fill-2);">
+            <svg viewBox="0 0 16 16" width="13" height="13" fill="none"><path d="M3 4.4h10M6.4 4.4V3.1a1 1 0 0 1 1-1h1.2a1 1 0 0 1 1 1v1.3M4.3 4.4l.55 8.1a1 1 0 0 0 1 .93h4.3a1 1 0 0 0 1-.93l.55-8.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"></path></svg>Delete All…
+          </button>
+          </sc-if>
+        </div>
+      </div>
+
+      <!-- content -->
+      <div style="flex:1;overflow:auto;background:var(--list-bg);">
+
+        <!-- grouped list -->
+        <sc-if value="{{ mgrList }}">
+        <div style="padding:14px;display:flex;flex-direction:column;gap:12px;">
+          <sc-for list="{{ sets }}" as="set" hint-placeholder-count="2">
+            <div style="background:var(--content-bg);border-radius:10px;box-shadow:var(--card-shadow);overflow:hidden;">
+              <div onClick="{{ set.toggle }}" style="display:flex;align-items:center;gap:11px;padding:12px 13px;cursor:pointer;" style-hover="background:var(--fill);">
+                <span style="color:var(--secondary);display:flex;transition:transform .15s ease;transform:{{ set.chev }};"><svg viewBox="0 0 12 12" width="11" height="11" fill="none"><path d="M4 2.5 8 6 4 9.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"></path></svg></span>
+                <span style="width:32px;height:32px;border-radius:8px;background:var(--fill);display:flex;align-items:center;justify-content:center;color:var(--secondary);flex-shrink:0;"><svg viewBox="0 0 24 24" width="17" height="17" fill="none"><rect x="2.6" y="3.4" width="18.8" height="13" rx="2.3" stroke="currentColor" stroke-width="1.7"></rect><path d="M9 20.4h6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"></path><path d="M12 16.4v4" stroke="currentColor" stroke-width="1.7"></path></svg></span>
+                <div style="min-width:0;">
+                  <div style="font-size:13.5px;font-weight:590;letter-spacing:-0.01em;">{{ set.label }}</div>
+                  <div style="font-size:11.5px;color:var(--secondary);margin-top:1px;">{{ set.meta }}</div>
+                </div>
+                <span style="margin-left:auto;font-size:11.5px;color:var(--secondary);white-space:nowrap;">{{ set.summary }}</span>
+                <button style="appearance:none;border:none;margin:0;font-family:inherit;background:transparent;color:var(--tertiary);display:flex;padding:5px;border-radius:6px;cursor:pointer;" style-hover="background:var(--fill-2);color:var(--red);">
+                  <svg viewBox="0 0 16 16" width="14" height="14" fill="none"><path d="M3 4.4h10M6.4 4.4V3.1a1 1 0 0 1 1-1h1.2a1 1 0 0 1 1 1v1.3M4.3 4.4l.55 8.1a1 1 0 0 0 1 .93h4.3a1 1 0 0 0 1-.93l.55-8.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+                </button>
+              </div>
+              <sc-if value="{{ set.open }}">
+                <div style="border-top:0.5px solid var(--separator);">
+                  <sc-for list="{{ set.apps }}" as="app" hint-placeholder-count="3">
+                    <div onClick="{{ app.toggle }}" style="display:flex;align-items:center;gap:10px;padding:{{ rowPadV }} 13px {{ rowPadV }} 40px;cursor:pointer;" style-hover="background:var(--fill);">
+                      <span style="color:var(--tertiary);display:flex;transition:transform .15s ease;transform:{{ app.chev }};"><svg viewBox="0 0 12 12" width="10" height="10" fill="none"><path d="M4 2.5 8 6 4 9.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"></path></svg></span>
+                      <span style="width:22px;height:22px;border-radius:5.5px;background:{{ app.color }};display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:700;flex-shrink:0;box-shadow:inset 0 0 0 0.5px rgba(255,255,255,0.18);">{{ app.mono }}</span>
+                      <span style="font-size:13px;font-weight:500;">{{ app.name }}</span>
+                      <span style="margin-left:auto;font-size:11.5px;color:var(--secondary);">{{ app.count }}</span>
+                      <button style="appearance:none;border:none;margin:0;font-family:inherit;background:transparent;color:var(--tertiary);display:flex;padding:4px;border-radius:6px;cursor:pointer;" style-hover="background:var(--fill-2);color:var(--red);"><svg viewBox="0 0 16 16" width="13" height="13" fill="none"><path d="M3 4.4h10M6.4 4.4V3.1a1 1 0 0 1 1-1h1.2a1 1 0 0 1 1 1v1.3M4.3 4.4l.55 8.1a1 1 0 0 0 1 .93h4.3a1 1 0 0 0 1-.93l.55-8.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"></path></svg></button>
+                    </div>
+                    <sc-if value="{{ app.open }}">
+                      <sc-for list="{{ app.windows }}" as="win" hint-placeholder-count="1">
+                        <div style="display:flex;align-items:center;gap:9px;padding:7px 13px 7px 72px;" style-hover="background:var(--fill);">
+                          <span style="color:var(--tertiary);display:flex;"><svg viewBox="0 0 16 16" width="14" height="14" fill="none"><rect x="2" y="3" width="12" height="10" rx="1.7" stroke="currentColor" stroke-width="1.3"></rect><path d="M2 6h12" stroke="currentColor" stroke-width="1.3"></path></svg></span>
+                          <span style="font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:330px;">{{ win.title }}</span>
+                          <span style="margin-left:auto;font-family:ui-monospace,'SF Mono',Menlo,monospace;font-size:11px;color:var(--tertiary);white-space:nowrap;">{{ win.frame }}</span>
+                          <button style="appearance:none;border:none;margin:0;font-family:inherit;background:transparent;color:var(--tertiary);display:flex;padding:3px;border-radius:6px;cursor:pointer;" style-hover="color:var(--red);"><svg viewBox="0 0 16 16" width="14" height="14" fill="none"><circle cx="8" cy="8" r="6.4" stroke="currentColor" stroke-width="1.3"></circle><path d="M6 6l4 4M10 6l-4 4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"></path></svg></button>
+                        </div>
+                      </sc-for>
+                    </sc-if>
+                  </sc-for>
+                </div>
+              </sc-if>
+            </div>
+          </sc-for>
+        </div>
+        </sc-if>
+
+        <!-- card overview -->
+        <sc-if value="{{ mgrCards }}">
+        <div style="padding:14px;display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <sc-for list="{{ sets }}" as="set" hint-placeholder-count="2">
+            <div style="background:var(--content-bg);border-radius:11px;box-shadow:var(--card-shadow);padding:16px;display:flex;flex-direction:column;gap:11px;">
+              <div style="display:flex;align-items:flex-start;gap:11px;">
+                <span style="width:44px;height:44px;border-radius:10px;background:var(--fill);display:flex;align-items:center;justify-content:center;color:var(--accent);flex-shrink:0;"><svg viewBox="0 0 24 24" width="24" height="24" fill="none"><rect x="2.6" y="3.4" width="18.8" height="13" rx="2.3" stroke="currentColor" stroke-width="1.7"></rect><path d="M9 20.4h6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"></path><path d="M12 16.4v4" stroke="currentColor" stroke-width="1.7"></path></svg></span>
+                <div style="min-width:0;flex:1;">
+                  <div style="font-size:14px;font-weight:600;letter-spacing:-0.01em;">{{ set.label }}</div>
+                  <div style="font-size:11.5px;color:var(--secondary);margin-top:2px;">{{ set.resLine }}</div>
+                </div>
+                <button style="appearance:none;border:none;margin:0;font-family:inherit;background:transparent;color:var(--tertiary);display:flex;padding:4px;border-radius:6px;cursor:pointer;" style-hover="background:var(--fill-2);color:var(--red);"><svg viewBox="0 0 16 16" width="14" height="14" fill="none"><path d="M3 4.4h10M6.4 4.4V3.1a1 1 0 0 1 1-1h1.2a1 1 0 0 1 1 1v1.3M4.3 4.4l.55 8.1a1 1 0 0 0 1 .93h4.3a1 1 0 0 0 1-.93l.55-8.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"></path></svg></button>
+              </div>
+              <div style="display:flex;gap:7px;flex-wrap:wrap;">
+                <sc-for list="{{ set.apps }}" as="app" hint-placeholder-count="4"><span style="width:26px;height:26px;border-radius:6.5px;background:{{ app.color }};display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:700;box-shadow:inset 0 0 0 0.5px rgba(255,255,255,0.18);">{{ app.mono }}</span></sc-for>
+              </div>
+              <div style="display:flex;align-items:center;justify-content:space-between;padding-top:10px;border-top:0.5px solid var(--separator);">
+                <span style="font-size:11.5px;color:var(--secondary);">{{ set.summary }}</span>
+                <span style="font-size:11.5px;color:var(--tertiary);">Last seen {{ set.lastSeen }}</span>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+        </sc-if>
+
+        <!-- empty -->
+        <sc-if value="{{ mgrEmpty }}">
+        <div style="height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:11px;padding:40px;text-align:center;">
+          <span style="color:var(--tertiary);display:flex;"><svg viewBox="0 0 24 24" width="46" height="46" fill="none"><rect x="2.6" y="3.4" width="18.8" height="13" rx="2.3" stroke="currentColor" stroke-width="1.5"></rect><path d="M9 20.4h6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path><path d="M12 16.4v4" stroke="currentColor" stroke-width="1.5"></path><path d="M12 7v3.4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path><circle cx="12" cy="12.9" r="0.95" fill="currentColor"></circle></svg></span>
+          <div style="font-size:15px;font-weight:600;">Nothing remembered yet</div>
+          <div style="font-size:12.5px;color:var(--secondary);line-height:1.5;max-width:340px;">Connect an external monitor and arrange your app windows. Monitor Glue will remember their positions automatically.</div>
+        </div>
+        </sc-if>
+
+      </div>
+    </div>
+    <div style="width:760px;max-width:100%;margin-top:18px;color:var(--secondary);font-size:11.5px;line-height:1.5;opacity:.85;">Resizable window · ~720×520pt. <strong style="color:var(--label);font-weight:600;">View</strong> switches the list hierarchy; rows expand monitor set → app → window with its saved frame (x, y · w×h).</div>
+    </sc-if>
+
+    <!-- ============ ONBOARDING ============ -->
+    <sc-if value="{{ isOnboarding }}">
+    <sc-if value="{{ obCentered }}">
+    <div style="width:540px;max-width:100%;background:var(--win-bg);border-radius:11px;overflow:hidden;box-shadow:0 28px 64px rgba(0,0,0,0.34),0 0 0 0.5px var(--win-edge),0 2px 6px rgba(0,0,0,0.12);color:var(--label);">
+      <div style="display:flex;gap:8px;padding:14px 16px;background:var(--titlebar);border-bottom:0.5px solid var(--separator);">
+        <span style="width:12px;height:12px;border-radius:50%;background:#FF5F57;box-shadow:inset 0 0 0 0.5px rgba(0,0,0,0.12);"></span>
+        <span style="width:12px;height:12px;border-radius:50%;background:#FEBC2E;box-shadow:inset 0 0 0 0.5px rgba(0,0,0,0.12);"></span>
+        <span style="width:12px;height:12px;border-radius:50%;background:#28C840;box-shadow:inset 0 0 0 0.5px rgba(0,0,0,0.12);"></span>
+      </div>
+      <div style="background:var(--content-bg);padding:34px 40px 0;display:flex;flex-direction:column;align-items:center;text-align:center;">
+        <div style="width:74px;height:74px;border-radius:17px;background:linear-gradient(160deg,#3a8bff,#1457d8);display:flex;align-items:center;justify-content:center;color:#fff;box-shadow:0 6px 16px rgba(20,87,216,0.4),inset 0 1px 0 rgba(255,255,255,0.45);"><svg viewBox="0 0 24 24" width="40" height="40" fill="none"><rect x="2.6" y="3.4" width="18.8" height="13" rx="2.3" stroke="currentColor" stroke-width="1.7"></rect><path d="M9 20.4h6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"></path><path d="M12 16.4v4" stroke="currentColor" stroke-width="1.7"></path><circle cx="12" cy="8.6" r="2.3" fill="currentColor"></circle><path d="M12 10.9v3.1" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"></path></svg></div>
+        <div style="font-size:22px;font-weight:680;letter-spacing:-0.02em;margin-top:18px;">Welcome to Monitor Glue</div>
+        <div style="font-size:13.5px;color:var(--secondary);line-height:1.5;margin-top:7px;max-width:380px;">Monitor Glue keeps your windows glued to the right monitor — and puts them back when you reconnect a display it recognizes.</div>
+
+        <div style="width:100%;margin-top:24px;background:var(--fill);border-radius:11px;padding:16px;display:flex;gap:13px;text-align:left;">
+          <span style="color:var(--accent);flex-shrink:0;display:flex;margin-top:1px;"><svg viewBox="0 0 24 24" width="26" height="26" fill="none"><circle cx="12" cy="12" r="9.4" stroke="currentColor" stroke-width="1.6"></circle><circle cx="12" cy="8.4" r="1.7" fill="currentColor"></circle><path d="M7.4 11.2c1.5.6 3 .9 4.6.9s3.1-.3 4.6-.9M12 12.1v3M12 15.1l-2.1 3.2M12 15.1l2.1 3.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path></svg></span>
+          <div>
+            <div style="font-size:13.5px;font-weight:600;">One permission: Accessibility</div>
+            <div style="font-size:12.5px;color:var(--secondary);line-height:1.5;margin-top:3px;">It lets Monitor Glue read and move other apps' windows — the only thing it needs to restore your layout.</div>
+          </div>
+        </div>
+
+        <div style="font-size:11.5px;color:var(--tertiary);line-height:1.5;margin-top:12px;max-width:400px;">Monitor Glue never reads window contents — only their size and position.</div>
+
+        <button style="appearance:none;border:none;margin:24px 0 0;font-family:inherit;background:var(--accent);color:#fff;font-size:14px;font-weight:570;padding:10px 22px;border-radius:9px;cursor:pointer;box-shadow:0 2px 8px rgba(10,108,245,0.3);" style-hover="filter:brightness(1.07);">Open Accessibility Settings…</button>
+        <button style="appearance:none;border:none;margin:6px 0 0;font-family:inherit;background:transparent;color:var(--accent);font-size:12.5px;font-weight:500;padding:7px;cursor:pointer;" style-hover="opacity:.7;">I'll do this later</button>
+      </div>
+      <div style="background:var(--content-bg);margin-top:24px;padding:14px 40px;border-top:0.5px solid var(--separator);display:flex;align-items:center;gap:9px;">
+        <span style="color:var(--secondary);display:flex;flex-shrink:0;"><svg viewBox="0 0 16 16" width="15" height="15" fill="none"><circle cx="8" cy="8" r="6.6" stroke="currentColor" stroke-width="1.3"></circle><path d="M8 5v3.2l2.1 1.3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"></path></svg></span>
+        <span style="font-size:11.5px;color:var(--secondary);line-height:1.45;"><strong style="color:var(--label);font-weight:600;">How it works · </strong>Arrange your windows once. Reconnect a monitor it knows, and they snap back automatically.</span>
+      </div>
+    </div>
+    </sc-if>
+
+    <sc-if value="{{ obSplit }}">
+    <div style="width:720px;max-width:100%;height:460px;background:var(--win-bg);border-radius:11px;overflow:hidden;box-shadow:0 28px 64px rgba(0,0,0,0.34),0 0 0 0.5px var(--win-edge),0 2px 6px rgba(0,0,0,0.12);color:var(--label);display:flex;flex-direction:column;">
+      <div style="display:flex;gap:8px;padding:14px 16px;background:var(--titlebar);border-bottom:0.5px solid var(--separator);flex-shrink:0;">
+        <span style="width:12px;height:12px;border-radius:50%;background:#FF5F57;box-shadow:inset 0 0 0 0.5px rgba(0,0,0,0.12);"></span>
+        <span style="width:12px;height:12px;border-radius:50%;background:#FEBC2E;box-shadow:inset 0 0 0 0.5px rgba(0,0,0,0.12);"></span>
+        <span style="width:12px;height:12px;border-radius:50%;background:#28C840;box-shadow:inset 0 0 0 0.5px rgba(0,0,0,0.12);"></span>
+      </div>
+      <div style="flex:1;display:flex;min-height:0;">
+        <div style="flex:1.05;background:var(--content-bg);padding:34px 32px;display:flex;flex-direction:column;">
+          <div style="width:48px;height:48px;border-radius:12px;background:linear-gradient(160deg,#3a8bff,#1457d8);display:flex;align-items:center;justify-content:center;color:#fff;box-shadow:0 4px 12px rgba(20,87,216,0.38),inset 0 1px 0 rgba(255,255,255,0.45);"><svg viewBox="0 0 24 24" width="27" height="27" fill="none"><rect x="2.6" y="3.4" width="18.8" height="13" rx="2.3" stroke="currentColor" stroke-width="1.7"></rect><path d="M9 20.4h6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"></path><path d="M12 16.4v4" stroke="currentColor" stroke-width="1.7"></path><circle cx="12" cy="8.6" r="2.3" fill="currentColor"></circle><path d="M12 10.9v3.1" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"></path></svg></div>
+          <div style="font-size:21px;font-weight:680;letter-spacing:-0.02em;margin-top:18px;">Allow Accessibility access</div>
+          <div style="font-size:13px;color:var(--secondary);line-height:1.55;margin-top:9px;">Monitor Glue needs Accessibility access to read and move other apps' windows. It's the only permission required, and it never reads window contents.</div>
+          <div style="font-size:11.5px;color:var(--tertiary);line-height:1.5;margin-top:14px;display:flex;gap:8px;align-items:flex-start;"><span style="color:var(--secondary);flex-shrink:0;margin-top:1px;display:flex;"><svg viewBox="0 0 16 16" width="14" height="14" fill="none"><circle cx="8" cy="8" r="6.6" stroke="currentColor" stroke-width="1.3"></circle><path d="M8 5v3.2l2.1 1.3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"></path></svg></span><span><strong style="color:var(--label);font-weight:600;">How it works · </strong>Arrange your windows once; reconnect a monitor it knows and they snap right back.</span></div>
+          <div style="margin-top:auto;display:flex;flex-direction:column;align-items:flex-start;gap:6px;">
+            <button style="appearance:none;border:none;margin:0;font-family:inherit;background:var(--accent);color:#fff;font-size:13.5px;font-weight:560;padding:9px 18px;border-radius:9px;cursor:pointer;box-shadow:0 2px 8px rgba(10,108,245,0.3);" style-hover="filter:brightness(1.07);">Open Accessibility Settings…</button>
+            <button style="appearance:none;border:none;margin:0;font-family:inherit;background:transparent;color:var(--accent);font-size:12.5px;font-weight:500;padding:4px 0;cursor:pointer;" style-hover="opacity:.7;">I'll do this later</button>
+          </div>
+        </div>
+        <div style="flex:1;background:var(--list-bg);border-left:0.5px solid var(--separator);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:24px;">
+          <div style="position:relative;width:212px;">
+            <div style="background:var(--win-bg);border:0.5px solid var(--win-edge);border-radius:9px;padding:8px;box-shadow:0 8px 22px rgba(0,0,0,0.18);">
+              <div style="display:flex;gap:6px;height:60px;">
+                <div style="flex:1.4;border-radius:5px;background:linear-gradient(160deg,#3a8bff,#1f63d8);box-shadow:inset 0 0 0 0.5px rgba(255,255,255,0.2);"></div>
+                <div style="flex:1;display:flex;flex-direction:column;gap:6px;">
+                  <div style="flex:1;border-radius:5px;background:var(--fill-2);"></div>
+                  <div style="flex:1;border-radius:5px;background:var(--fill-2);"></div>
+                </div>
+              </div>
+            </div>
+            <div style="margin:6px auto 0;width:50px;height:5px;border-radius:0 0 3px 3px;background:var(--win-edge);"></div>
+            <div style="position:absolute;top:-9px;right:-9px;width:26px;height:26px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;color:#fff;box-shadow:0 3px 8px rgba(10,108,245,0.45);"><svg viewBox="0 0 24 24" width="14" height="14" fill="none"><circle cx="12" cy="8.6" r="2.6" fill="currentColor"></circle><path d="M12 11.2v6" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"></path></svg></div>
+          </div>
+          <div style="font-size:11.5px;color:var(--secondary);text-align:center;line-height:1.45;">Reconnect a known display →<br>windows glued back in place.</div>
+        </div>
+      </div>
+    </div>
+    </sc-if>
+    </sc-if>
+
+    <!-- ============ ICONS & STATES ============ -->
+    <sc-if value="{{ isAssets }}">
+    <div style="width:640px;max-width:100%;display:flex;flex-direction:column;gap:14px;">
+
+      <div style="background:var(--content-bg);border-radius:13px;box-shadow:0 1px 3px rgba(0,0,0,0.1),0 0 0 0.5px var(--win-edge);padding:22px;color:var(--label);">
+        <div style="font-size:12px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:var(--tertiary);margin-bottom:16px;">Menu-bar icon</div>
+        <div style="display:flex;gap:24px;align-items:center;flex-wrap:wrap;">
+          <div style="display:flex;flex-direction:column;align-items:center;gap:8px;">
+            <div style="display:flex;align-items:center;gap:12px;height:26px;padding:0 12px;border-radius:7px;background:var(--menubar-strip);box-shadow:0 0 0 0.5px var(--win-edge);color:var(--label);"><span style="display:flex;width:24px;height:19px;border-radius:5px;background:var(--menubar-active);align-items:center;justify-content:center;"><svg viewBox="0 0 24 24" width="15" height="15" fill="none"><rect x="2.6" y="3.4" width="18.8" height="13" rx="2.3" stroke="currentColor" stroke-width="1.8"></rect><path d="M9 20.4h6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path><path d="M12 16.4v4" stroke="currentColor" stroke-width="1.8"></path><circle cx="12" cy="8.6" r="2.3" fill="currentColor"></circle><path d="M12 10.9v3.1" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path></svg></span></div>
+            <span style="font-size:11px;color:var(--tertiary);">in the menu bar</span>
+          </div>
+          <div style="flex:1;min-width:200px;font-size:12.5px;color:var(--secondary);line-height:1.55;">A monochrome <strong style="color:var(--label);font-weight:600;">template glyph</strong> — a display with a pin/anchor through it. As a template image it inherits the menu-bar tint, so it reads correctly in light and dark menu bars and when highlighted.</div>
+        </div>
+      </div>
+
+      <div style="background:var(--content-bg);border-radius:13px;box-shadow:0 1px 3px rgba(0,0,0,0.1),0 0 0 0.5px var(--win-edge);padding:22px;color:var(--label);">
+        <div style="font-size:12px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:var(--tertiary);margin-bottom:16px;">App icon</div>
+        <div style="display:flex;gap:22px;align-items:flex-end;">
+          <div style="width:92px;height:92px;border-radius:21px;background:linear-gradient(160deg,#3a8bff,#1457d8);display:flex;align-items:center;justify-content:center;color:#fff;box-shadow:0 8px 20px rgba(20,87,216,0.38),inset 0 1px 0 rgba(255,255,255,0.45);"><svg viewBox="0 0 24 24" width="50" height="50" fill="none" style="width: 66px; height: 66px"><rect x="2.6" y="3.4" width="18.8" height="13" rx="2.3" stroke="currentColor" stroke-width="1.7"></rect><path d="M9 20.4h6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"></path><path d="M12 16.4v4" stroke="currentColor" stroke-width="1.7"></path><circle cx="12" cy="8.6" r="2.3" fill="currentColor"></circle><path d="M12 10.9v3.1" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"></path></svg></div>
+          <div style="width:56px;height:56px;border-radius:13px;background:linear-gradient(160deg,#3a8bff,#1457d8);display:flex;align-items:center;justify-content:center;color:#fff;box-shadow:0 4px 10px rgba(20,87,216,0.34),inset 0 0.5px 0 rgba(255,255,255,0.45);"><svg viewBox="0 0 24 24" width="31" height="31" fill="none" style="width: 39px; height: 39px"><rect x="2.6" y="3.4" width="18.8" height="13" rx="2.3" stroke="currentColor" stroke-width="1.8"></rect><path d="M9 20.4h6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path><path d="M12 16.4v4" stroke="currentColor" stroke-width="1.8"></path><circle cx="12" cy="8.6" r="2.3" fill="currentColor"></circle><path d="M12 10.9v3.1" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path></svg></div>
+          <div style="width:32px;height:32px;border-radius:7.5px;background:linear-gradient(160deg,#3a8bff,#1457d8);display:flex;align-items:center;justify-content:center;color:#fff;box-shadow:inset 0 0.5px 0 rgba(255,255,255,0.45);"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" style="width: 21px; height: 21px"><rect x="2.6" y="3.4" width="18.8" height="13" rx="2.3" stroke="currentColor" stroke-width="2"></rect><path d="M9 20.4h6" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path><path d="M12 16.4v4" stroke="currentColor" stroke-width="2"></path><circle cx="12" cy="8.6" r="2.3" fill="currentColor"></circle><path d="M12 10.9v3.1" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path></svg></div>
+          <div style="flex:1;font-size:12.5px;color:var(--secondary);line-height:1.55;align-self:center;">Full-color squircle for the Finder / About box. The same glyph, reversed white on the brand blue. (No Dock icon — the app runs as a menu-bar accessory.)</div>
+        </div>
+      </div>
+
+      <div style="background:var(--content-bg);border-radius:13px;box-shadow:0 1px 3px rgba(0,0,0,0.1),0 0 0 0.5px var(--win-edge);padding:22px;color:var(--label);">
+        <div style="font-size:12px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:var(--tertiary);margin-bottom:16px;">Status &amp; permission colors</div>
+        <div style="display:flex;flex-direction:column;gap:14px;">
+          <div style="display:flex;align-items:center;gap:13px;">
+            <span style="width:28px;height:28px;border-radius:7px;background:var(--green);flex-shrink:0;box-shadow:inset 0 0 0 0.5px rgba(0,0,0,0.1);"></span>
+            <div style="flex:1;"><div style="font-size:13px;font-weight:590;">Tracking · granted</div><div style="font-size:11.5px;color:var(--secondary);">System green — checkmark in the popover, "access granted" in the manager.</div></div>
+            <span style="font-family:ui-monospace,'SF Mono',Menlo,monospace;font-size:11px;color:var(--tertiary);">systemGreen</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:13px;">
+            <span style="width:28px;height:28px;border-radius:7px;background:var(--orange);flex-shrink:0;box-shadow:inset 0 0 0 0.5px rgba(0,0,0,0.1);"></span>
+            <div style="flex:1;"><div style="font-size:13px;font-weight:590;">Permission needed</div><div style="font-size:11.5px;color:var(--secondary);">System orange — warning triangle, "Grant access" affordance, banner tint.</div></div>
+            <span style="font-family:ui-monospace,'SF Mono',Menlo,monospace;font-size:11px;color:var(--tertiary);">systemOrange</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:13px;">
+            <span style="width:28px;height:28px;border-radius:7px;background:var(--accent);flex-shrink:0;box-shadow:inset 0 0 0 0.5px rgba(0,0,0,0.1);"></span>
+            <div style="flex:1;"><div style="font-size:13px;font-weight:590;">Accent · primary action</div><div style="font-size:11.5px;color:var(--secondary);">System accent (blue) — "Restore windows now", primary buttons, menu highlight.</div></div>
+            <span style="font-family:ui-monospace,'SF Mono',Menlo,monospace;font-size:11px;color:var(--tertiary);">accentColor</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:13px;">
+            <span style="width:28px;height:28px;border-radius:7px;background:var(--red);flex-shrink:0;box-shadow:inset 0 0 0 0.5px rgba(0,0,0,0.1);"></span>
+            <div style="flex:1;"><div style="font-size:13px;font-weight:590;">Destructive</div><div style="font-size:11.5px;color:var(--secondary);">System red — delete / forget actions and "Delete All" confirmation.</div></div>
+            <span style="font-family:ui-monospace,'SF Mono',Menlo,monospace;font-size:11px;color:var(--tertiary);">systemRed</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+    </sc-if>
+
+  </main>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{
+  &quot;$preview&quot;: { &quot;width&quot;: &quot;100%&quot;, &quot;height&quot;: 860 },
+  &quot;appearance&quot;: { &quot;editor&quot;: &quot;enum&quot;, &quot;options&quot;: [&quot;light&quot;, &quot;dark&quot;], &quot;default&quot;: &quot;light&quot;, &quot;tsType&quot;: &quot;'light' | 'dark'&quot;, &quot;section&quot;: &quot;Mockup&quot; },
+  &quot;surface&quot;: { &quot;editor&quot;: &quot;enum&quot;, &quot;options&quot;: [&quot;menubar&quot;, &quot;manager&quot;, &quot;onboarding&quot;, &quot;assets&quot;], &quot;default&quot;: &quot;menubar&quot;, &quot;tsType&quot;: &quot;string&quot;, &quot;section&quot;: &quot;Mockup&quot; },
+  &quot;granted&quot;: { &quot;editor&quot;: &quot;boolean&quot;, &quot;default&quot;: true, &quot;tsType&quot;: &quot;boolean&quot;, &quot;section&quot;: &quot;State&quot; },
+  &quot;density&quot;: { &quot;editor&quot;: &quot;enum&quot;, &quot;options&quot;: [&quot;comfortable&quot;, &quot;compact&quot;], &quot;default&quot;: &quot;comfortable&quot;, &quot;tsType&quot;: &quot;string&quot;, &quot;section&quot;: &quot;Manager&quot; }
+}">
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = {
+      appearance: props.appearance || 'light',
+      surface: props.surface || 'menubar',
+      granted: props.granted !== false,
+      density: props.density || 'comfortable',
+      managerVariant: 'list',
+      onboardingVariant: 'centered',
+      open: { home: true, 'home/Safari': true }
+    };
+  }
+
+  segStyle(active) {
+    return 'appearance:none;border:none;margin:0;cursor:pointer;font-family:inherit;font-size:13px;letter-spacing:-0.01em;font-weight:' + (active ? 590 : 470) +
+      ';padding:5px 13px;border-radius:7px;white-space:nowrap;color:' + (active ? '#fff' : 'rgba(255,255,255,0.6)') +
+      ';background:' + (active ? 'rgba(255,255,255,0.15)' : 'transparent') +
+      ';box-shadow:' + (active ? '0 1px 2px rgba(0,0,0,0.35)' : 'none') + ';transition:background .12s,color .12s;';
+  }
+
+  seg(opts, current, key) {
+    return opts.map(o => ({
+      label: o.label,
+      style: this.segStyle(current === o.value),
+      onClick: () => this.setState({ [key]: o.value })
+    }));
+  }
+
+  toggle(k) {
+    return () => this.setState(s => ({ open: { ...s.open, [k]: !s.open[k] } }));
+  }
+
+  renderVals() {
+    const s = this.state;
+
+    const DATA = [
+      {
+        key: 'home',
+        label: 'Dell U2720Q + LG HDR 4K',
+        displays: [{ name: 'Dell U2720Q', res: '3840 × 2160' }, { name: 'LG HDR 4K', res: '3840 × 2160' }],
+        lastSeen: 'Today at 9:14 AM',
+        apps: [
+          { name: 'Safari', color: '#2E86FF', windows: [
+            { title: 'Apple — Start Page', x: 40, y: 64, w: 1280, h: 900 },
+            { title: 'GitHub — erango/monitor-glue', x: 1360, y: 64, w: 1200, h: 880 } ] },
+          { name: 'Xcode', color: '#4E7CC4', windows: [
+            { title: 'MonitorGlue — MenuBarContent.swift', x: 60, y: 120, w: 1760, h: 1120 } ] },
+          { name: 'Figma', color: '#9747FF', windows: [
+            { title: 'Monitor Glue UI', x: 120, y: 80, w: 1640, h: 1000 } ] },
+          { name: 'Slack', color: '#5B2C5E', windows: [
+            { title: 'bizzabo — #design', x: 2240, y: 96, w: 920, h: 1200 } ] }
+        ]
+      },
+      {
+        key: 'office',
+        label: 'Studio Display',
+        displays: [{ name: 'Studio Display', res: '5120 × 2880' }],
+        lastSeen: 'Jun 27 at 6:02 PM',
+        apps: [
+          { name: 'Safari', color: '#2E86FF', windows: [
+            { title: 'Linear — Sprint 24', x: 80, y: 90, w: 1500, h: 1200 } ] },
+          { name: 'Mail', color: '#1F8BEA', windows: [
+            { title: 'Inbox — 3 messages', x: 1620, y: 90, w: 1200, h: 1000 } ] },
+          { name: 'Terminal', color: '#3A3F49', windows: [
+            { title: 'monitor-glue — zsh', x: 80, y: 1320, w: 1200, h: 760 } ] }
+        ]
+      }
+    ];
+
+    const sets = DATA.map(set => {
+      const winCount = set.apps.reduce((n, a) => n + a.windows.length, 0);
+      const resLine = set.displays.map(d => d.res).join('  ·  ');
+      return {
+        key: set.key,
+        label: set.label,
+        resLine,
+        meta: resLine + '   ·   Last seen ' + set.lastSeen,
+        lastSeen: set.lastSeen,
+        summary: set.apps.length + ' apps · ' + winCount + ' windows',
+        winCount,
+        open: !!s.open[set.key],
+        chev: s.open[set.key] ? 'rotate(90deg)' : 'rotate(0deg)',
+        toggle: this.toggle(set.key),
+        apps: set.apps.map(app => ({
+          name: app.name,
+          color: app.color,
+          mono: app.name === 'Terminal' ? '›' : app.name[0],
+          count: app.windows.length,
+          open: !!s.open[set.key + '/' + app.name],
+          chev: s.open[set.key + '/' + app.name] ? 'rotate(90deg)' : 'rotate(0deg)',
+          toggle: this.toggle(set.key + '/' + app.name),
+          windows: app.windows.map((w, i) => ({
+            title: w.title || ('Window ' + (i + 1)),
+            frame: w.x + ', ' + w.y + '  ·  ' + w.w + '×' + w.h
+          }))
+        }))
+      };
+    });
+
+    return {
+      appearance: s.appearance,
+      isMenubar: s.surface === 'menubar',
+      isManager: s.surface === 'manager',
+      isOnboarding: s.surface === 'onboarding',
+      isAssets: s.surface === 'assets',
+      granted: s.granted,
+      notGranted: !s.granted,
+      hasSets: true,
+      mgrList: s.managerVariant === 'list',
+      mgrCards: s.managerVariant === 'cards',
+      mgrEmpty: s.managerVariant === 'empty',
+      obCentered: s.onboardingVariant === 'centered',
+      obSplit: s.onboardingVariant === 'split',
+      rowPadV: s.density === 'compact' ? '6px' : '10px',
+      sets,
+      openManager: () => this.setState({ surface: 'manager' }),
+      surfaceTabs: this.seg([
+        { label: 'Menu Bar', value: 'menubar' },
+        { label: 'Manager', value: 'manager' },
+        { label: 'Onboarding', value: 'onboarding' },
+        { label: 'Icons & States', value: 'assets' }
+      ], s.surface, 'surface'),
+      appearanceTabs: this.seg([
+        { label: 'Light', value: 'light' },
+        { label: 'Dark', value: 'dark' }
+      ], s.appearance, 'appearance'),
+      stateTabs: this.seg([
+        { label: 'Tracking', value: true },
+        { label: 'Needs permission', value: false }
+      ], s.granted, 'granted'),
+      mgrVarTabs: this.seg([
+        { label: 'Grouped list', value: 'list' },
+        { label: 'Card overview', value: 'cards' },
+        { label: 'Empty', value: 'empty' }
+      ], s.managerVariant, 'managerVariant'),
+      obVarTabs: this.seg([
+        { label: 'Centered', value: 'centered' },
+        { label: 'Split', value: 'split' }
+      ], s.onboardingVariant, 'onboardingVariant')
+    };
+  }
+}
+</script>
+</body>
+</html>

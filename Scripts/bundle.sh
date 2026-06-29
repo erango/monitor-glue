@@ -11,6 +11,11 @@ CONFIG="release"
 DIST="$ROOT/dist"
 APP="$DIST/$APP_NAME.app"
 
+if [[ ! -f "$ROOT/Resources/AppIcon.icns" ]]; then
+    echo "==> Generating app icon…"
+    "$ROOT/Scripts/make_icon.sh"
+fi
+
 echo "==> Building ($CONFIG)…"
 swift build -c "$CONFIG"
 

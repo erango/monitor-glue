@@ -8,10 +8,12 @@ struct MonitorGlueApp: App {
     @StateObject private var permissions = Permissions.shared
 
     var body: some Scene {
-        MenuBarExtra("Monitor Glue", systemImage: "display") {
+        MenuBarExtra {
             MenuBarContent()
                 .environmentObject(model)
                 .environmentObject(permissions)
+        } label: {
+            Image(nsImage: AppGlyph.menuBarTemplate())
         }
         .menuBarExtraStyle(.window)
 
@@ -19,16 +21,24 @@ struct MonitorGlueApp: App {
             ManagementView()
                 .environmentObject(model)
                 .environmentObject(permissions)
-                .frame(minWidth: 640, minHeight: 460)
+                .frame(minWidth: 720, minHeight: 520)
         }
-        .windowResizability(.contentSize)
+        .windowResizability(.contentMinSize)
+        .defaultSize(width: 760, height: 548)
     }
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)  // No Dock icon.
+        if DebugPreview.requested != nil {
+            DebugPreview.runIfRequested()   // Gated harness — skip live watchers/polling.
+            return
+        }
         AppModel.shared.start()
+        if !Permissions.shared.isTrusted {
+            OnboardingController.shared.show()
+        }
     }
 }
 
@@ -39,6 +49,14 @@ final class AppModel: ObservableObject {
     @Published var currentSetKey: String = ""
     @Published var rememberedCount: Int = 0
     @Published var statusText: String = "Starting…"
+
+    // Richer status surfaced in the menu-bar dropdown.
+    @Published var connectedExternalDisplays: Int = 0
+    @Published var currentSetLabel: String = ""
+    @Published var currentSetWindowCount: Int = 0
+    @Published var totalWindowsRemembered: Int = 0
+
+    var isTracking: Bool { connectedExternalDisplays > 0 && Permissions.shared.isTrusted }
 
     private let watcher = DisplayWatcher()
 
@@ -77,13 +95,27 @@ final class AppModel: ObservableObject {
     }
 
     func refreshStatus() {
-        rememberedCount = LayoutStore.shared.allSets().count
+        let sets = LayoutStore.shared.allSets()
+        rememberedCount = sets.count
+        totalWindowsRemembered = sets.reduce(0) { $0 + $1.windows.count }
+
+        let externals = DisplayInfo.externalDisplays()
+        connectedExternalDisplays = externals.count
+
+        if let record = LayoutStore.shared.record(for: currentSetKey) {
+            currentSetLabel = record.label
+            currentSetWindowCount = record.windows.count
+        } else {
+            currentSetLabel = externals.map { $0.localizedName }.sorted().joined(separator: " + ")
+            currentSetWindowCount = 0
+        }
+
         if !Permissions.shared.isTrusted {
             statusText = "Accessibility access needed"
-        } else if currentSetKey.isEmpty {
+        } else if connectedExternalDisplays == 0 {
             statusText = "Built-in display only — idle"
         } else {
-            statusText = "Tracking \(rememberedCount) monitor set\(rememberedCount == 1 ? "" : "s")"
+            statusText = "Tracking · \(connectedExternalDisplays) display\(connectedExternalDisplays == 1 ? "" : "s") connected"
         }
     }
 }

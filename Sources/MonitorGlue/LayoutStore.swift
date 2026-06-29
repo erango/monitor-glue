@@ -109,6 +109,11 @@ final class LayoutStore {
         queue.sync { data.monitorSets[setKey] }
     }
 
+    /// Load in-memory records without persisting — used by the gated UI preview harness.
+    func injectForPreview(_ injected: LayoutStoreData) {
+        queue.sync { data = injected }
+    }
+
     func allSets() -> [MonitorSetRecord] {
         queue.sync { Array(data.monitorSets.values).sorted { $0.lastSeen > $1.lastSeen } }
     }

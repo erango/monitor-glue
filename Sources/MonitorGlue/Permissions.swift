@@ -10,6 +10,9 @@ final class Permissions: ObservableObject {
 
     private var timer: Timer?
 
+    /// Force a trust value for the gated UI preview harness only.
+    func _setPreviewTrusted(_ value: Bool) { isTrusted = value }
+
     /// Re-check trust state (no prompt).
     func refresh() {
         let trusted = AXIsProcessTrusted()
