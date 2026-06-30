@@ -54,7 +54,10 @@ struct ManagementView: View {
                 Button(role: .destructive) {
                     confirmDeleteAll = true
                 } label: {
-                    Label("Delete All…", systemImage: "trash")
+                    HStack(spacing: 5) {
+                        MGIcon.trash.frame(width: 13, height: 13)
+                        Text("Delete All…")
+                    }
                 }
             }
         }
@@ -163,13 +166,13 @@ private struct SetCard: View {
                         .frame(width: 17, height: 17))
                 VStack(alignment: .leading, spacing: 2) {
                     Text(set.label.isEmpty ? "Unknown displays" : set.label)
-                        .font(.system(size: 13.5, weight: .medium))
+                        .font(.system(size: 13.5, weight: .semibold))
                     Text(metaLine).font(.system(size: 11.5)).foregroundStyle(.secondary)
                 }
                 Spacer()
                 Text("\(apps.count) app\(apps.count == 1 ? "" : "s") · \(set.windows.count) window\(set.windows.count == 1 ? "" : "s")")
                     .font(.system(size: 11.5)).foregroundStyle(.secondary)
-                DeleteButton(systemImage: "trash", help: "Forget this entire monitor set") {
+                DeleteButton(icon: MGIcon.trash, help: "Forget this entire monitor set") {
                     LayoutStore.shared.deleteSet(key: set.key); onChange()
                 }
             }
@@ -201,7 +204,7 @@ private struct SetCard: View {
                     Text(app.name).font(.system(size: 13, weight: .medium))
                     Spacer()
                     Text("\(app.windows.count)").font(.system(size: 11.5)).foregroundStyle(.secondary)
-                    DeleteButton(systemImage: "trash", help: "Forget this app on this monitor set") {
+                    DeleteButton(icon: MGIcon.trash, help: "Forget this app on this monitor set") {
                         LayoutStore.shared.deleteApp(setKey: set.key, bundleID: app.bundleID); onChange()
                     }
                 }
@@ -225,7 +228,7 @@ private struct SetCard: View {
             Text(verbatim: "\(Int(win.x)), \(Int(win.y))  ·  \(Int(win.width))×\(Int(win.height))")
                 .font(.system(size: 11, design: .monospaced))
                 .foregroundStyle(.tertiary)
-            DeleteButton(systemImage: "xmark.circle", help: "Forget this window") {
+            DeleteButton(icon: MGIcon.xCircle, help: "Forget this window") {
                 LayoutStore.shared.deleteWindow(setKey: set.key, windowID: win.id); onChange()
             }
         }
@@ -241,14 +244,15 @@ private struct SetCard: View {
 
 /// Tertiary→red delete affordance used at every level of the tree.
 private struct DeleteButton: View {
-    let systemImage: String
+    let icon: SVGIcon
     let help: String
     let action: () -> Void
     @State private var hovering = false
 
     var body: some View {
         Button(action: action) {
-            Image(systemName: systemImage)
+            icon
+                .frame(width: 14, height: 14)
                 .foregroundStyle(hovering ? Theme.red : Color.secondary.opacity(0.6))
         }
         .buttonStyle(.plain)

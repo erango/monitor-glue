@@ -18,18 +18,18 @@ struct MenuBarContent: View {
 
             Divider()
 
-            MenuRow(title: "Restore windows now", systemImage: "arrow.uturn.backward",
+            MenuRow(title: "Restore windows now", icon: MGIcon.restore,
                     shortcut: "⌘R", disabled: !canRestore) {
                 model.restoreNow()
             }
-            MenuRow(title: "Open Manager…", systemImage: "rectangle.stack") {
+            MenuRow(title: "Open Manager…", icon: MGIcon.manager) {
                 openWindow(id: "manager")
                 NSApp.activate(ignoringOtherApps: true)
             }
 
             Divider()
 
-            MenuRow(title: "Quit Monitor Glue", systemImage: "power", shortcut: "⌘Q") {
+            MenuRow(title: "Quit Monitor Glue", icon: MGIcon.power, shortcut: "⌘Q") {
                 NSApp.terminate(nil)
             }
 
@@ -52,7 +52,7 @@ struct MenuBarContent: View {
             MonitorGlyph()
                 .foregroundStyle(Theme.accent)
                 .frame(width: 17, height: 17)
-            Text("Monitor Glue").font(.system(size: 15, weight: .semibold))
+            Text("Monitor Glue").font(.system(size: 14.5, weight: .semibold))
         }
     }
 
@@ -67,7 +67,7 @@ struct MenuBarContent: View {
                 Text(model.connectedExternalDisplays > 0
                      ? "Tracking · \(model.connectedExternalDisplays) display\(model.connectedExternalDisplays == 1 ? "" : "s") connected"
                      : "Idle · built-in display only")
-                    .font(.system(size: 13, weight: .medium))
+                    .font(.system(size: 13, weight: .semibold))
                 if model.connectedExternalDisplays > 0, !model.currentSetLabel.isEmpty {
                     Text("\(model.currentSetLabel) · \(model.currentSetWindowCount) window\(model.currentSetWindowCount == 1 ? "" : "s")")
                         .font(.system(size: 11.5))
@@ -123,7 +123,7 @@ struct MenuBarContent: View {
 
             Link(destination: URL(string: "https://ko-fi.com/erango")!) {
                 HStack(spacing: 7) {
-                    Image(systemName: "cup.and.saucer.fill")
+                    MGIcon.kofiCup.frame(width: 17, height: 16)
                     Text("Buy me a coffee").font(.system(size: 12, weight: .semibold))
                 }
                 .foregroundStyle(.white)
@@ -140,7 +140,7 @@ struct MenuBarContent: View {
 /// Full-width menu row with accent hover highlight and an optional trailing shortcut.
 private struct MenuRow: View {
     let title: String
-    let systemImage: String
+    let icon: SVGIcon
     var shortcut: String? = nil
     var disabled: Bool = false
     let action: () -> Void
@@ -149,9 +149,8 @@ private struct MenuRow: View {
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 8) {
-                Image(systemName: systemImage)
-                    .frame(width: 17)
+            HStack(spacing: 9) {
+                icon.frame(width: 14, height: 14).frame(width: 17)
                 Text(title).font(.system(size: 13, weight: .medium))
                 Spacer(minLength: 8)
                 if let shortcut {
