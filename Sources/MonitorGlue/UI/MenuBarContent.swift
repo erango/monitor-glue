@@ -49,9 +49,9 @@ struct MenuBarContent: View {
 
     private var header: some View {
         HStack(spacing: 8) {
-            Image(systemName: "pin.fill")
-                .font(.system(size: 16))
+            MonitorGlyph()
                 .foregroundStyle(Theme.accent)
+                .frame(width: 17, height: 17)
             Text("Monitor Glue").font(.system(size: 15, weight: .semibold))
         }
     }

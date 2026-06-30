@@ -5,46 +5,54 @@ import AppKit
 let size = 1024.0
 let outPath = CommandLine.arguments.count > 1 ? CommandLine.arguments[1] : "icon_1024.png"
 
-func tinted(_ image: NSImage, _ color: NSColor) -> NSImage {
-    let copy = image.copy() as! NSImage
-    copy.lockFocus()
-    color.set()
-    NSRect(origin: .zero, size: copy.size).fill(using: .sourceAtop)
-    copy.unlockFocus()
-    return copy
-}
-
 let canvas = NSImage(size: NSSize(width: size, height: size))
 canvas.lockFocus()
 
 // Squircle background with brand gradient.
 let inset = size * 0.06
 let rect = NSRect(x: inset, y: inset, width: size - 2*inset, height: size - 2*inset)
-let path = NSBezierPath(roundedRect: rect, xRadius: size * 0.21, yRadius: size * 0.21)
-path.addClip()
+let bg = NSBezierPath(roundedRect: rect, xRadius: size * 0.21, yRadius: size * 0.21)
+bg.addClip()
 let gradient = NSGradient(colors: [
     NSColor(srgbRed: 0x3a/255.0, green: 0x8b/255.0, blue: 0xff/255.0, alpha: 1),
     NSColor(srgbRed: 0x14/255.0, green: 0x57/255.0, blue: 0xd8/255.0, alpha: 1),
 ])!
 gradient.draw(in: rect, angle: -60)
 
-// White display glyph, centered.
-let symCfg = NSImage.SymbolConfiguration(pointSize: size * 0.40, weight: .regular)
-if let display = NSImage(systemSymbolName: "display", accessibilityDescription: nil)?
-    .withSymbolConfiguration(symCfg) {
-    let white = tinted(display, .white)
-    let w = size * 0.46, h = w * (display.size.height / display.size.width)
-    white.draw(in: NSRect(x: (size - w)/2, y: (size - h)/2, width: w, height: h))
-}
+// Brand mark: monitor on a stand with a centered location-pin (design SVG, viewBox 24).
+// AppKit is y-up, the SVG is y-down — map with cy = oy + (24 - y) * scale.
+let glyph = size * 0.52
+let scale = glyph / 24.0
+let ox = (size - glyph) / 2.0
+let oy = (size - glyph) / 2.0
+func pt(_ x: Double, _ y: Double) -> NSPoint { NSPoint(x: ox + x*scale, y: oy + (24 - y)*scale) }
 
-// White pin badge, upper-right of the glyph.
-let pinCfg = NSImage.SymbolConfiguration(pointSize: size * 0.18, weight: .bold)
-if let pin = NSImage(systemSymbolName: "pin.fill", accessibilityDescription: nil)?
-    .withSymbolConfiguration(pinCfg) {
-    let white = tinted(pin, .white)
-    let w = size * 0.20, h = w * (pin.size.height / pin.size.width)
-    white.draw(in: NSRect(x: size * 0.58, y: size * 0.54, width: w, height: h))
-}
+NSColor.white.setStroke()
+NSColor.white.setFill()
+let lw = 1.7 * scale
+
+// Screen.
+let screen = NSBezierPath(roundedRect:
+    NSRect(x: ox + 2.6*scale, y: oy + (24 - 16.4)*scale, width: 18.8*scale, height: 13*scale),
+    xRadius: 2.3*scale, yRadius: 2.3*scale)
+screen.lineWidth = lw
+screen.stroke()
+
+// Stand base + neck.
+let stand = NSBezierPath()
+stand.lineWidth = lw
+stand.lineCapStyle = .round
+stand.move(to: pt(9, 20.4));  stand.line(to: pt(15, 20.4))
+stand.move(to: pt(12, 16.4)); stand.line(to: pt(12, 20.4))
+// Pin stem.
+stand.move(to: pt(12, 10.9)); stand.line(to: pt(12, 14))
+stand.stroke()
+
+// Pin head.
+let r = 2.3 * scale
+let head = NSBezierPath(ovalIn: NSRect(x: ox + 12*scale - r, y: oy + (24 - 8.6)*scale - r,
+                                       width: 2*r, height: 2*r))
+head.fill()
 
 canvas.unlockFocus()
 

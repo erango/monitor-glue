@@ -35,31 +35,58 @@ enum Theme {
     }
 }
 
+/// The Monitor Glue brand mark: a monitor on a stand with a location-pin centered in the
+/// screen. Stroked outline in the current foreground color (matches the design handoff SVG,
+/// viewBox 0 0 24 24). `showPin` off → a plain monitor (used for management list tiles).
+struct MonitorGlyph: View {
+    var showPin: Bool = true
+    var lineWidth: CGFloat = 1.7   // in the 24-unit design space
+
+    var body: some View {
+        GeometryReader { geo in
+            let s = min(geo.size.width, geo.size.height) / 24
+            ZStack {
+                Path { p in
+                    // Screen.
+                    p.addRoundedRect(in: CGRect(x: 2.6 * s, y: 3.4 * s, width: 18.8 * s, height: 13 * s),
+                                     cornerSize: CGSize(width: 2.3 * s, height: 2.3 * s))
+                    // Stand base + neck.
+                    p.move(to: CGPoint(x: 9 * s, y: 20.4 * s)); p.addLine(to: CGPoint(x: 15 * s, y: 20.4 * s))
+                    p.move(to: CGPoint(x: 12 * s, y: 16.4 * s)); p.addLine(to: CGPoint(x: 12 * s, y: 20.4 * s))
+                    // Pin stem.
+                    if showPin { p.move(to: CGPoint(x: 12 * s, y: 10.9 * s)); p.addLine(to: CGPoint(x: 12 * s, y: 14 * s)) }
+                }
+                .stroke(style: StrokeStyle(lineWidth: lineWidth * s, lineCap: .round, lineJoin: .round))
+
+                // Pin head.
+                if showPin {
+                    Circle()
+                        .frame(width: 4.6 * s, height: 4.6 * s)
+                        .position(x: 12 * s, y: 8.6 * s)
+                }
+            }
+        }
+    }
+}
+
 /// App + menu-bar glyph rendering.
 enum AppGlyph {
-    /// Monochrome template image for the menu-bar item: a display with a pin badge.
-    static func menuBarTemplate() -> NSImage {
-        let size = NSSize(width: 18, height: 16)
-        let image = NSImage(size: size, flipped: false) { _ in
-            let cfg = NSImage.SymbolConfiguration(pointSize: 14, weight: .regular)
-            if let display = NSImage(systemSymbolName: "display", accessibilityDescription: "display")?
-                .withSymbolConfiguration(cfg) {
-                display.draw(in: NSRect(x: 0, y: 1, width: 16, height: 14))
-            }
-            let pinCfg = NSImage.SymbolConfiguration(pointSize: 8, weight: .bold)
-            if let pin = NSImage(systemSymbolName: "pin.fill", accessibilityDescription: "pinned")?
-                .withSymbolConfiguration(pinCfg) {
-                pin.draw(in: NSRect(x: 11, y: 8, width: 8, height: 8))
-            }
-            return true
-        }
+    /// Monochrome template image for the menu-bar item (the brand monitor+pin mark).
+    @MainActor static func menuBarTemplate() -> NSImage {
+        let renderer = ImageRenderer(
+            content: MonitorGlyph(lineWidth: 1.9)
+                .foregroundStyle(.black)
+                .frame(width: 18, height: 18)
+                .padding(.horizontal, 1)
+        )
+        renderer.scale = 2
+        let image = renderer.nsImage ?? NSImage(size: NSSize(width: 18, height: 18))
         image.isTemplate = true
         return image
     }
 }
 
-/// Brand app-icon squircle used in onboarding and the menu header — a white display+pin
-/// glyph on the brand-blue gradient.
+/// Brand app-icon squircle (onboarding + header) — the white brand mark on the brand gradient.
 struct BrandSquircle: View {
     var size: CGFloat = 74
     var body: some View {
@@ -67,13 +94,9 @@ struct BrandSquircle: View {
             RoundedRectangle(cornerRadius: size * 0.23, style: .continuous)
                 .fill(LinearGradient(colors: [Theme.brandTop, Theme.brandBottom],
                                      startPoint: .topLeading, endPoint: .bottomTrailing))
-            Image(systemName: "display")
-                .font(.system(size: size * 0.42, weight: .regular))
+            MonitorGlyph(lineWidth: 1.7)
                 .foregroundStyle(.white)
-            Image(systemName: "pin.fill")
-                .font(.system(size: size * 0.20, weight: .bold))
-                .foregroundStyle(.white)
-                .offset(x: size * 0.20, y: -size * 0.05)
+                .frame(width: size * 0.52, height: size * 0.52)
         }
         .frame(width: size, height: size)
         .shadow(color: Theme.brandBottom.opacity(0.45), radius: size * 0.12, y: size * 0.05)

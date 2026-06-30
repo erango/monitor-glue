@@ -6,8 +6,9 @@ import AppKit
 enum DebugPreview {
     static var requested: String? { ProcessInfo.processInfo.environment["MG_PREVIEW"] }
 
-    static func runIfRequested() {
+    @MainActor static func runIfRequested() {
         guard let what = requested else { return }
+        if what == "glyph" { dumpMenuBarGlyph(); return }
         seedSampleData()
         if what == "menu" { Permissions.shared._setPreviewTrusted(true) }
         AppModel.shared.currentSetKey = "UUID-DELL|UUID-LG"
@@ -71,6 +72,28 @@ enum DebugPreview {
         win.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
         objc_setAssociatedObject(NSApp, "mg_preview_win", win, .OBJC_ASSOCIATION_RETAIN)
+    }
+
+    /// Render the menu-bar template glyph onto a white tile at menu-bar scale, then exit.
+    @MainActor private static func dumpMenuBarGlyph() {
+        let tmpl = AppGlyph.menuBarTemplate()
+        let tileH = 44.0, tileW = 60.0
+        let tile = NSImage(size: NSSize(width: tileW, height: tileH))
+        tile.lockFocus()
+        NSColor.white.setFill()
+        NSRect(x: 0, y: 0, width: tileW, height: tileH).fill()
+        // Template draws in black via the current fill color.
+        NSColor.black.set()
+        let g = 18.0
+        tmpl.draw(in: NSRect(x: (tileW-g)/2, y: (tileH-g)/2, width: g, height: g),
+                  from: .zero, operation: .sourceOver, fraction: 1.0)
+        tile.unlockFocus()
+        if let tiff = tile.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff),
+           let png = rep.representation(using: .png, properties: [:]) {
+            let path = ProcessInfo.processInfo.environment["MG_GLYPH_OUT"] ?? "/tmp/mg_glyph.png"
+            try? png.write(to: URL(fileURLWithPath: path))
+        }
+        NSApp.terminate(nil)
     }
 
     private static func showMenu() {

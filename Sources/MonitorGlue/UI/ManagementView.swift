@@ -76,9 +76,9 @@ struct ManagementView: View {
     private var emptyState: some View {
         VStack(spacing: 10) {
             Spacer()
-            Image(systemName: "display.trianglebadge.exclamationmark")
-                .font(.system(size: 46))
+            MonitorGlyph(lineWidth: 1.5)
                 .foregroundStyle(.tertiary)
+                .frame(width: 46, height: 46)
             Text("Nothing remembered yet").font(.system(size: 15, weight: .semibold))
             Text("Connect an external monitor and arrange your app windows. Monitor Glue will remember their positions automatically.")
                 .font(.system(size: 12.5))
@@ -158,7 +158,9 @@ private struct SetCard: View {
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
                     .fill(Theme.controlFill)
                     .frame(width: 32, height: 32)
-                    .overlay(Image(systemName: "display").foregroundStyle(.secondary))
+                    .overlay(MonitorGlyph(showPin: false)
+                        .foregroundStyle(.secondary)
+                        .frame(width: 17, height: 17))
                 VStack(alignment: .leading, spacing: 2) {
                     Text(set.label.isEmpty ? "Unknown displays" : set.label)
                         .font(.system(size: 13.5, weight: .medium))
