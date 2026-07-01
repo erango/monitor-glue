@@ -47,14 +47,24 @@ block it on first launch. That's expected.
 Requires Swift 5.9+ (Command Line Tools are enough — no full Xcode needed).
 
 ```bash
-./Scripts/bundle.sh        # builds and assembles dist/MonitorGlue.app (ad-hoc signed)
+./Scripts/make_cert.sh     # once: create a stable self-signed identity (see below)
+./Scripts/bundle.sh        # builds and assembles dist/MonitorGlue.app
 open dist/MonitorGlue.app
 ```
 
+**Why `make_cert.sh`:** an ad-hoc signature gets a fresh code hash on every rebuild, so macOS
+silently invalidates the Accessibility grant each time (the toggle looks ON in System Settings
+but the app still reports "access needed"). `make_cert.sh` creates a stable self-signed
+code-signing identity once; `bundle.sh` then signs with it, so the grant survives rebuilds.
+It's self-signed (not notarized) — this only stabilizes the permission, it does not change the
+Gatekeeper steps above. If a rebuild ever still shows the banner, reset once with
+`tccutil reset Accessibility com.erango.monitorglue` and re-grant.
+
 ## Notes & limitations
 
-- Because the app is ad-hoc signed, **updating it may require re-granting Accessibility access**
-  (the binary's signature changes between builds).
+- Local builds signed via `make_cert.sh` keep the Accessibility grant across rebuilds. Release
+  binaries built in CI are ad-hoc signed, so **installing a new release may require re-granting
+  Accessibility access** once (there's no notarized identity to key the grant to).
 - Window repositioning is best-effort. Some apps (Electron, full-screen, tabbed windows) may
   resist exact placement; Monitor Glue logs and skips what it can't place rather than forcing it.
 

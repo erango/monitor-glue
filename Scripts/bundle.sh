@@ -36,7 +36,16 @@ if [[ -f "$ROOT/Resources/AppIcon.icns" ]]; then
     /usr/libexec/PlistBuddy -c "Add :CFBundleIconFile string AppIcon" "$APP/Contents/Info.plist" 2>/dev/null || true
 fi
 
-echo "==> Ad-hoc signing…"
-codesign --force --deep --sign - "$APP"
+# Prefer a stable self-signed identity so the Accessibility (TCC) grant survives rebuilds.
+# Falls back to ad-hoc (grant must be re-approved after each rebuild).
+IDENTITY="Monitor Glue Self-Signed"
+if security find-identity 2>/dev/null | grep -q "$IDENTITY"; then
+    echo "==> Signing with stable identity '$IDENTITY'…"
+    codesign --force --deep --sign "$IDENTITY" "$APP"
+else
+    echo "==> No stable identity found — ad-hoc signing (run Scripts/make_cert.sh to make the"
+    echo "    Accessibility permission persist across rebuilds)."
+    codesign --force --deep --sign - "$APP"
+fi
 
 echo "==> Done: $APP"
