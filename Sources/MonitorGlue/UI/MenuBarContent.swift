@@ -3,6 +3,7 @@ import SwiftUI
 struct MenuBarContent: View {
     @EnvironmentObject var model: AppModel
     @EnvironmentObject var permissions: Permissions
+    @StateObject private var loginItem = LoginItem.shared
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
@@ -29,6 +30,17 @@ struct MenuBarContent: View {
 
             Divider()
 
+            Toggle(isOn: Binding(
+                get: { loginItem.isEnabled },
+                set: { loginItem.setEnabled($0) }
+            )) {
+                Text("Launch at login").font(.system(size: 13, weight: .medium))
+            }
+            .toggleStyle(.checkbox)
+            .padding(.vertical, 2).padding(.horizontal, 8)
+
+            Divider()
+
             MenuRow(title: "Quit Monitor Glue", icon: MGIcon.power, shortcut: "⌘Q") {
                 NSApp.terminate(nil)
             }
@@ -38,7 +50,7 @@ struct MenuBarContent: View {
         }
         .padding(12)
         .frame(width: 320)
-        .onAppear { model.refreshStatus() }
+        .onAppear { model.refreshStatus(); loginItem.refresh() }
     }
 
     private var canRestore: Bool {

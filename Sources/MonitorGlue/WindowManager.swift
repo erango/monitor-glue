@@ -33,6 +33,12 @@ enum WindowManager {
 
             for (idx, win) in windows.enumerated() {
                 guard let frame = frame(of: win) else { continue }
+                // Only real, movable windows: standard subrole, not minimized, non-trivial size.
+                // Filters out Finder desktop windows, palettes, PiP slivers, etc.
+                guard (copyValue(win, kAXSubroleAttribute) as? String) == (kAXStandardWindowSubrole as String)
+                else { continue }
+                if let minimized = copyValue(win, kAXMinimizedAttribute) as? Bool, minimized { continue }
+                guard frame.width >= 100, frame.height >= 100 else { continue }
                 let title = (copyValue(win, kAXTitleAttribute) as? String) ?? ""
                 result.append(LiveWindow(
                     element: win,

@@ -73,7 +73,7 @@ final class AppModel: ObservableObject {
         LayoutCapturer.shared.start()
 
         // Restore on launch if we already know this set.
-        if !currentSetKey.isEmpty { LayoutRestorer.restore(setKey: currentSetKey) }
+        if !currentSetKey.isEmpty { restoreWithRetries(currentSetKey) }
         refreshStatus()
     }
 
@@ -81,12 +81,20 @@ final class AppModel: ObservableObject {
         currentSetKey = key
         LayoutCapturer.shared.currentSetKey = key
         if !key.isEmpty, LayoutStore.shared.record(for: key) != nil {
-            // Let apps/windows settle after the display comes online, then restore.
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+            restoreWithRetries(key)
+        }
+        refreshStatus()
+    }
+
+    /// Restore several times after a display connects — macOS keeps reshuffling windows for a
+    /// second or two, so a single pass can be undone. Each pass is idempotent.
+    private func restoreWithRetries(_ key: String) {
+        for delay in [0.8, 2.0, 3.5] {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                guard self.currentSetKey == key else { return }   // display changed again
                 LayoutRestorer.restore(setKey: key)
             }
         }
-        refreshStatus()
     }
 
     func restoreNow() {

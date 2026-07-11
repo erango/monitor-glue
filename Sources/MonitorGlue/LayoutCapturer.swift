@@ -40,13 +40,16 @@ final class LayoutCapturer {
         for win in live {
             // Only remember windows that live on an external display.
             guard let disp = WindowManager.display(for: win, in: displays), !disp.isBuiltin else { continue }
+            // Store the position RELATIVE to the display's origin, so restore works even when
+            // the display comes back at a different arrangement origin next session.
             layouts.append(WindowLayout(
                 appBundleID: win.appBundleID,
                 appName: win.appName,
                 displayUUID: disp.uuid,
                 windowTitle: win.title,
                 windowIndex: win.index,
-                x: win.frame.origin.x, y: win.frame.origin.y,
+                x: win.frame.origin.x - disp.bounds.origin.x,
+                y: win.frame.origin.y - disp.bounds.origin.y,
                 width: win.frame.size.width, height: win.frame.size.height,
                 updatedAt: now
             ))

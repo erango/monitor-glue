@@ -11,14 +11,14 @@ enum LayoutRestorer {
 
         let displays = DisplayInfo.liveDisplays()
         let liveByBundle = Dictionary(grouping: WindowManager.currentWindows(), by: { $0.appBundleID })
-        // Only restore to displays that are actually present now.
-        let presentUUIDs = Set(displays.map { $0.uuid })
+        // Only restore to displays that are actually present now, keyed by UUID.
+        let displaysByUUID = Dictionary(uniqueKeysWithValues: displays.map { ($0.uuid, $0) })
 
         var moved = 0
         var usedElements = Set<UInt>()  // Avoid moving the same window twice.
 
         for layout in record.windows {
-            guard presentUUIDs.contains(layout.displayUUID) else { continue }
+            guard let disp = displaysByUUID[layout.displayUUID] else { continue }
             guard let candidates = liveByBundle[layout.appBundleID], !candidates.isEmpty else { continue }
 
             let match = bestMatch(for: layout, in: candidates, used: usedElements)
@@ -27,7 +27,11 @@ enum LayoutRestorer {
             let token = UInt(bitPattern: ObjectIdentifier(win.element).hashValue)
             if usedElements.contains(token) { continue }
 
-            if WindowManager.setFrame(win.element, layout.frame) {
+            // Saved coords are relative to the display origin → map to its current position.
+            let target = CGRect(x: disp.bounds.origin.x + layout.x,
+                                y: disp.bounds.origin.y + layout.y,
+                                width: layout.width, height: layout.height)
+            if WindowManager.setFrame(win.element, target) {
                 usedElements.insert(token)
                 moved += 1
             }

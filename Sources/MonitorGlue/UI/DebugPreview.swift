@@ -9,6 +9,16 @@ enum DebugPreview {
     @MainActor static func runIfRequested() {
         guard let what = requested else { return }
         if what == "glyph" { dumpMenuBarGlyph(); return }
+        if what == "diag" { diag(); return }
+        if what == "testmove" { testMove(); return }
+        if what == "testlogin" {
+            var out = "before status enabled=\(LoginItem.shared.isEnabled)\n"
+            LoginItem.shared.setEnabled(true)
+            out += "after register enabled=\(LoginItem.shared.isEnabled)\n"
+            LoginItem.shared.setEnabled(false)
+            out += "after unregister enabled=\(LoginItem.shared.isEnabled)\n"
+            write(out); NSApp.terminate(nil); return
+        }
         seedSampleData()
         if what == "menu" { Permissions.shared._setPreviewTrusted(true) }
         AppModel.shared.currentSetKey = "UUID-DELL|UUID-LG"
@@ -71,10 +81,51 @@ enum DebugPreview {
         win.isReleasedWhenClosed = false
         win.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
-        objc_setAssociatedObject(NSApp, "mg_preview_win", win, .OBJC_ASSOCIATION_RETAIN)
+        objc_setAssociatedObject(NSApplication.shared, "mg_preview_win", win, .OBJC_ASSOCIATION_RETAIN)
     }
 
     /// Render the menu-bar template glyph onto a white tile at menu-bar scale, then exit.
+    /// Print AX trust, displays, and filtered/mapped windows, then exit. Writes to MG_DIAG_OUT.
+    @MainActor private static func diag() {
+        var out = "trusted=\(AXIsProcessTrusted())\n"
+        for d in DisplayInfo.liveDisplays() {
+            out += "DISPLAY \(d.isBuiltin ? "[builtin]" : "[external]") \(d.localizedName) uuid=\(d.uuid.prefix(8)) bounds=\(d.bounds)\n"
+        }
+        let displays = DisplayInfo.liveDisplays()
+        for w in WindowManager.currentWindows() {
+            let disp = WindowManager.display(for: w, in: displays)
+            let rel = disp.map { CGPoint(x: w.frame.origin.x - $0.bounds.origin.x, y: w.frame.origin.y - $0.bounds.origin.y) }
+            out += "WIN \(w.appName) | '\(w.title.prefix(30))' idx=\(w.index) frame=\(w.frame) -> disp=\(disp?.localizedName ?? "none") rel=\(rel.map{"(\(Int($0.x)),\(Int($0.y)))"} ?? "-")\n"
+        }
+        let path = ProcessInfo.processInfo.environment["MG_DIAG_OUT"] ?? "/tmp/mg_diag.txt"
+        try? out.write(toFile: path, atomically: true, encoding: .utf8)
+        NSApp.terminate(nil)
+    }
+
+    /// Verify AX write: nudge the first external window by (150,150), read it back, restore.
+    @MainActor private static func testMove() {
+        let displays = DisplayInfo.liveDisplays()
+        var out = "trusted=\(AXIsProcessTrusted())\n"
+        guard let w = WindowManager.currentWindows().first(where: {
+            WindowManager.display(for: $0, in: displays).map { !$0.isBuiltin } ?? false
+        }) else { out += "no external window found\n"; write(out); NSApp.terminate(nil); return }
+
+        let before = w.frame
+        let nudged = CGRect(x: before.origin.x + 150, y: before.origin.y + 150,
+                            width: before.width, height: before.height)
+        let ok = WindowManager.setFrame(w.element, nudged)
+        let after = WindowManager.frame(of: w.element) ?? .zero
+        out += "target=\(w.appName) '\(w.title.prefix(24))'\n"
+        out += "setFrame returned=\(ok)\nbefore=\(before)\nafter =\(after)\nmoved=\(after.origin != before.origin)\n"
+        _ = WindowManager.setFrame(w.element, before)   // put it back
+        write(out); NSApp.terminate(nil)
+    }
+
+    private static func write(_ s: String) {
+        let path = ProcessInfo.processInfo.environment["MG_DIAG_OUT"] ?? "/tmp/mg_diag.txt"
+        try? s.write(toFile: path, atomically: true, encoding: .utf8)
+    }
+
     @MainActor private static func dumpMenuBarGlyph() {
         let tmpl = AppGlyph.menuBarTemplate()
         let tileH = 44.0, tileW = 60.0
@@ -111,6 +162,6 @@ enum DebugPreview {
         win.isReleasedWhenClosed = false
         win.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
-        objc_setAssociatedObject(NSApp, "mg_preview_win", win, .OBJC_ASSOCIATION_RETAIN)
+        objc_setAssociatedObject(NSApplication.shared, "mg_preview_win", win, .OBJC_ASSOCIATION_RETAIN)
     }
 }
