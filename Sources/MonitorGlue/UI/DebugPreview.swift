@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import ServiceManagement
 
 /// Gated screenshot/preview harness. Activated only when launched with the env var
 /// `MG_PREVIEW=manager` (or `=onboarding`). No effect in normal use.
@@ -11,6 +12,23 @@ enum DebugPreview {
         if what == "glyph" { dumpMenuBarGlyph(); return }
         if what == "diag" { diag(); return }
         if what == "testmove" { testMove(); return }
+        if what == "loginstatus" {
+            let s = SMAppService.mainApp.status
+            let name: String
+            switch s {
+            case .enabled: name = "enabled"
+            case .requiresApproval: name = "requiresApproval"
+            case .notRegistered: name = "notRegistered"
+            case .notFound: name = "notFound"
+            @unknown default: name = "unknown(\(s.rawValue))"
+            }
+            write("status=\(name) raw=\(s.rawValue)\n"); NSApp.terminate(nil); return
+        }
+        if what == "loginoff" {
+            do { try SMAppService.mainApp.unregister(); write("unregistered ok\n") }
+            catch { write("unregister error: \(error)\n") }
+            NSApp.terminate(nil); return
+        }
         if what == "testlogin" {
             var out = "before status enabled=\(LoginItem.shared.isEnabled)\n"
             LoginItem.shared.setEnabled(true)
