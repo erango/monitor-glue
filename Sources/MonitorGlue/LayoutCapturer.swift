@@ -12,6 +12,15 @@ final class LayoutCapturer {
     /// The monitor-set key currently being tracked (set by the app on display changes).
     var currentSetKey: String = ""
 
+    /// Capture is paused until this time. Right after a display connects, macOS has usually
+    /// not finished moving windows back, so a snapshot then would replace a good saved layout
+    /// with a half-migrated one. The app pauses capture while restore runs.
+    private var suppressedUntil: Date = .distantPast
+
+    func suppressCapture(for seconds: TimeInterval) {
+        suppressedUntil = Date().addingTimeInterval(seconds)
+    }
+
     func start() {
         timer?.invalidate()
         timer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
@@ -23,8 +32,10 @@ final class LayoutCapturer {
     func stop() { timer?.invalidate(); timer = nil }
 
     /// Take one snapshot now. Cheap no-op if nothing changed or no external display.
-    func capture() {
+    /// `force` bypasses the post-connect pause (used by tests).
+    func capture(force: Bool = false) {
         guard AXIsProcessTrusted() else { return }
+        guard force || Date() >= suppressedUntil else { return }
         let displays = DisplayInfo.liveDisplays()
         let externals = displays.filter { !$0.isBuiltin }
         guard !externals.isEmpty else { return }

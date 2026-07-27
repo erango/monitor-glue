@@ -12,6 +12,35 @@ enum DebugPreview {
         if what == "glyph" { dumpMenuBarGlyph(); return }
         if what == "diag" { diag(); return }
         if what == "testmove" { testMove(); return }
+        if what == "e2e" { e2e(); return }
+        if what == "testpoll" {
+            // A fresh watcher starts with an empty key, so poll() must notice the currently
+            // connected external display and report it — the same path that recovers a
+            // reconfiguration event the app never received.
+            let w = DisplayWatcher()
+            var fired: String? = nil
+            w.onChange = { fired = $0 }
+            w.poll()
+            let expected = DisplayInfo.monitorSetKey(for: DisplayInfo.liveDisplays())
+            write("expected=\(expected)\npollFired=\(fired ?? "nil")\nmatch=\(fired == expected)\n")
+            NSApp.terminate(nil); return
+        }
+        if what == "testrestore" {
+            let key = DisplayInfo.monitorSetKey(for: DisplayInfo.liveDisplays())
+            var out = "trusted=\(AXIsProcessTrusted())\ncurrentSetKey=\(key)\n"
+            out += "record found=\(LayoutStore.shared.record(for: key) != nil)\n"
+            if let rec = LayoutStore.shared.record(for: key) {
+                out += "saved windows=\(rec.windows.count)\n"
+                let live = WindowManager.currentWindows()
+                for l in rec.windows {
+                    let cands = live.filter { $0.appBundleID == l.appBundleID }
+                    out += "  layout \(l.appName) idx=\(l.windowIndex) '\(l.windowTitle.prefix(24))' -> liveCandidates=\(cands.count)\n"
+                }
+            }
+            let moved = LayoutRestorer.restore(setKey: key)
+            out += "restore moved=\(moved)\n"
+            write(out); NSApp.terminate(nil); return
+        }
         if what == "loginstatus" {
             let s = SMAppService.mainApp.status
             let name: String
@@ -118,6 +147,51 @@ enum DebugPreview {
         let path = ProcessInfo.processInfo.environment["MG_DIAG_OUT"] ?? "/tmp/mg_diag.txt"
         try? out.write(toFile: path, atomically: true, encoding: .utf8)
         NSApp.terminate(nil)
+    }
+
+    /// Full round-trip check that BOTH size and position are captured and restored:
+    /// set a distinctive frame on an external window → capture → move+resize it away →
+    /// restore → compare the restored frame against the captured one.
+    @MainActor private static func e2e() {
+        var out = "trusted=\(AXIsProcessTrusted())\n"
+        let displays = DisplayInfo.liveDisplays()
+        guard let ext = displays.first(where: { !$0.isBuiltin }) else {
+            out += "no external display\n"; write(out); NSApp.terminate(nil); return
+        }
+        guard let w = WindowManager.currentWindows().first(where: {
+            WindowManager.display(for: $0, in: displays).map { !$0.isBuiltin } ?? false
+        }) else { out += "no window on the external display\n"; write(out); NSApp.terminate(nil); return }
+
+        let original = w.frame
+        // 1. Distinctive frame (offset 220,180 into the display; 1400x900).
+        let distinctive = CGRect(x: ext.bounds.origin.x + 220, y: ext.bounds.origin.y + 180,
+                                width: 1400, height: 900)
+        _ = WindowManager.setFrame(w.element, distinctive)
+        let placed = WindowManager.frame(of: w.element) ?? .zero
+        out += "target=\(w.appName) '\(w.title.prefix(24))'\n1 placed=\(placed)\n"
+
+        // 2. Capture it.
+        LayoutCapturer.shared.capture(force: true)
+        let key = DisplayInfo.monitorSetKey(for: displays)
+        let saved = LayoutStore.shared.record(for: key)?.windows.first {
+            $0.appBundleID == w.appBundleID && $0.windowIndex == w.index
+        }
+        out += "2 saved rel=(\(Int(saved?.x ?? -1)),\(Int(saved?.y ?? -1))) size=\(Int(saved?.width ?? -1))x\(Int(saved?.height ?? -1))\n"
+
+        // 3. Move + resize away (different position AND different size).
+        _ = WindowManager.setFrame(w.element, CGRect(x: 60, y: 80, width: 700, height: 500))
+        out += "3 disturbed=\(WindowManager.frame(of: w.element) ?? .zero)\n"
+
+        // 4. Restore and compare.
+        let moved = LayoutRestorer.restore(setKey: key)
+        let after = WindowManager.frame(of: w.element) ?? .zero
+        out += "4 restored=\(after) moved=\(moved)\n"
+        let posOK = abs(after.origin.x - placed.origin.x) < 3 && abs(after.origin.y - placed.origin.y) < 3
+        let sizeOK = abs(after.width - placed.width) < 3 && abs(after.height - placed.height) < 3
+        out += "positionRestored=\(posOK)\nsizeRestored=\(sizeOK)\n"
+
+        _ = WindowManager.setFrame(w.element, original)   // put it back
+        write(out); NSApp.terminate(nil)
     }
 
     /// Verify AX write: nudge the first external window by (150,150), read it back, restore.

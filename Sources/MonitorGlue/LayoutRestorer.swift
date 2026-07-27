@@ -36,9 +36,7 @@ enum LayoutRestorer {
                 moved += 1
             }
         }
-        if moved > 0 {
-            NSLog("MonitorGlue: restored \(moved) window(s) for set \(record.label)")
-        }
+        NSLog("MonitorGlue: restore for '\(record.label)' — moved \(moved)/\(record.windows.count) saved window(s)")
         return moved
     }
 

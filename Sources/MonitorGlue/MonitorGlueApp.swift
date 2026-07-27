@@ -59,6 +59,7 @@ final class AppModel: ObservableObject {
     var isTracking: Bool { connectedExternalDisplays > 0 && Permissions.shared.isTrusted }
 
     private let watcher = DisplayWatcher()
+    private var pollTimer: Timer?
 
     func start() {
         Permissions.shared.refresh()
@@ -72,6 +73,12 @@ final class AppModel: ObservableObject {
         LayoutCapturer.shared.currentSetKey = currentSetKey
         LayoutCapturer.shared.start()
 
+        // Poll as a safety net for missed display-reconfiguration events (sleep/wake, dock
+        // swaps). Cheap: it only reads the display list and compares the monitor-set key.
+        pollTimer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: true) { [weak self] _ in
+            self?.watcher.poll()
+        }
+
         // Restore on launch if we already know this set.
         if !currentSetKey.isEmpty { restoreWithRetries(currentSetKey) }
         refreshStatus()
@@ -80,15 +87,17 @@ final class AppModel: ObservableObject {
     private func handleSetChange(_ key: String) {
         currentSetKey = key
         LayoutCapturer.shared.currentSetKey = key
-        if !key.isEmpty, LayoutStore.shared.record(for: key) != nil {
-            restoreWithRetries(key)
-        }
+        let known = !key.isEmpty && LayoutStore.shared.record(for: key) != nil
+        NSLog("MonitorGlue: monitor set changed → '\(key.isEmpty ? "built-in only" : key)' known=\(known)")
+        if known { restoreWithRetries(key) }
         refreshStatus()
     }
 
     /// Restore several times after a display connects — macOS keeps reshuffling windows for a
     /// second or two, so a single pass can be undone. Each pass is idempotent.
     private func restoreWithRetries(_ key: String) {
+        // Don't let a half-migrated snapshot overwrite the saved layout while restoring.
+        LayoutCapturer.shared.suppressCapture(for: 6.0)
         for delay in [0.8, 2.0, 3.5] {
             DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
                 guard self.currentSetKey == key else { return }   // display changed again

@@ -21,9 +21,11 @@ final class DisplayWatcher {
 
         let ctx = Unmanaged.passUnretained(self).toOpaque()
         let callback: CGDisplayReconfigurationCallBack = { _, flags, userInfo in
-            // Ignore begin-configuration churn; act on the settling flags.
-            guard flags.contains(.addFlag) || flags.contains(.removeFlag)
-                    || flags.contains(.enabledFlag) || flags.contains(.disabledFlag) else { return }
+            // Re-evaluate on any reconfiguration except the "begin" phase (nothing has changed
+            // yet at that point). Filtering to add/remove missed real reconnects — e.g. a
+            // display coming back after sleep reports only mode/enable flags. It's debounced
+            // and the key comparison makes extra evaluations free.
+            guard !flags.contains(.beginConfigurationFlag) else { return }
             guard let userInfo else { return }
             let watcher = Unmanaged<DisplayWatcher>.fromOpaque(userInfo).takeUnretainedValue()
             DispatchQueue.main.async { watcher.scheduleReevaluate() }
@@ -34,6 +36,11 @@ final class DisplayWatcher {
     }
 
     @objc private func screenParamsChanged() { scheduleReevaluate() }
+
+    /// Safety net: re-check the connected displays even if no notification arrived.
+    /// Long-running sessions (sleep/wake, dock swaps) can miss reconfiguration callbacks
+    /// entirely; polling makes a missed connect self-healing. No-op when nothing changed.
+    func poll() { reevaluate() }
 
     private func scheduleReevaluate() {
         debounce?.cancel()

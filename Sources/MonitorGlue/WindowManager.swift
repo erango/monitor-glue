@@ -22,6 +22,10 @@ enum WindowManager {
         guard AXIsProcessTrusted() else { return [] }
         var result: [LiveWindow] = []
         let ownPID = ProcessInfo.processInfo.processIdentifier
+        // Per-bundle counter so indices are dense and unique even when an app has several
+        // processes sharing one bundle ID (Chrome profiles) or windows were filtered out.
+        // Capture and restore both read indices from here, so they always agree.
+        var nextIndex: [String: Int] = [:]
 
         for app in NSWorkspace.shared.runningApplications {
             guard app.activationPolicy == .regular,
@@ -31,7 +35,7 @@ enum WindowManager {
             let appElement = AXUIElementCreateApplication(app.processIdentifier)
             guard let windows = copyValue(appElement, kAXWindowsAttribute) as? [AXUIElement] else { continue }
 
-            for (idx, win) in windows.enumerated() {
+            for win in windows {
                 guard let frame = frame(of: win) else { continue }
                 // Only real, movable windows: standard subrole, not minimized, non-trivial size.
                 // Filters out Finder desktop windows, palettes, PiP slivers, etc.
@@ -40,6 +44,8 @@ enum WindowManager {
                 if let minimized = copyValue(win, kAXMinimizedAttribute) as? Bool, minimized { continue }
                 guard frame.width >= 100, frame.height >= 100 else { continue }
                 let title = (copyValue(win, kAXTitleAttribute) as? String) ?? ""
+                let idx = nextIndex[bundleID, default: 0]
+                nextIndex[bundleID] = idx + 1
                 result.append(LiveWindow(
                     element: win,
                     appBundleID: bundleID,
