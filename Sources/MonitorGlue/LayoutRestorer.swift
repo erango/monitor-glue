@@ -14,48 +14,57 @@ enum LayoutRestorer {
         // Only restore to displays that are actually present now, keyed by UUID.
         let displaysByUUID = Dictionary(uniqueKeysWithValues: displays.map { ($0.uuid, $0) })
 
+        // Assign saved layouts to live windows in passes, strongest signal first. A greedy
+        // per-layout search would let an early layout's weak fallback steal the very window a
+        // later layout matches by title, leaving that one unrestored.
+        let restorable = record.windows.filter { displaysByUUID[$0.displayUUID] != nil }
+        var assignment: [Int: LiveWindow] = [:]      // layout offset → window
+        var usedElements = Set<UInt>()
+
+        func token(_ w: LiveWindow) -> UInt { UInt(bitPattern: ObjectIdentifier(w.element).hashValue) }
+        func claim(_ i: Int, _ w: LiveWindow) {
+            assignment[i] = w
+            usedElements.insert(token(w))
+        }
+        func available(_ bundleID: String) -> [LiveWindow] {
+            (liveByBundle[bundleID] ?? []).filter { !usedElements.contains(token($0)) }
+        }
+
+        // Pass 1: exact, non-empty title match.
+        for (i, layout) in restorable.enumerated() where assignment[i] == nil {
+            guard !layout.windowTitle.isEmpty else { continue }
+            if let w = available(layout.appBundleID).first(where: { $0.title == layout.windowTitle }) {
+                claim(i, w)
+            }
+        }
+        // Pass 2: same window index within the app.
+        for (i, layout) in restorable.enumerated() where assignment[i] == nil {
+            if let w = available(layout.appBundleID).first(where: { $0.index == layout.windowIndex }) {
+                claim(i, w)
+            }
+        }
+        // Pass 3: any remaining window of that app.
+        for (i, layout) in restorable.enumerated() where assignment[i] == nil {
+            if let w = available(layout.appBundleID).first { claim(i, w) }
+        }
+
         var moved = 0
-        var usedElements = Set<UInt>()  // Avoid moving the same window twice.
-
-        for layout in record.windows {
-            guard let disp = displaysByUUID[layout.displayUUID] else { continue }
-            guard let candidates = liveByBundle[layout.appBundleID], !candidates.isEmpty else { continue }
-
-            let match = bestMatch(for: layout, in: candidates, used: usedElements)
-            guard let win = match else { continue }
-
-            let token = UInt(bitPattern: ObjectIdentifier(win.element).hashValue)
-            if usedElements.contains(token) { continue }
-
+        for (i, layout) in restorable.enumerated() {
+            guard let win = assignment[i], let disp = displaysByUUID[layout.displayUUID] else { continue }
             // Saved coords are relative to the display origin → map to its current position.
             let target = CGRect(x: disp.bounds.origin.x + layout.x,
                                 y: disp.bounds.origin.y + layout.y,
                                 width: layout.width, height: layout.height)
-            if WindowManager.setFrame(win.element, target) {
-                usedElements.insert(token)
-                moved += 1
-            }
+            // Already in place (a retry pass) — nothing to do.
+            if win.frame.matches(target) { moved += 1; continue }
+            if WindowManager.setFrame(win.element, target) { moved += 1 }
+        }
+        let unmatched = restorable.count - assignment.count
+        if unmatched > 0 {
+            NSLog("MonitorGlue: \(unmatched) saved window(s) had no matching open window yet")
         }
         NSLog("MonitorGlue: restore for '\(record.label)' — moved \(moved)/\(record.windows.count) saved window(s)")
         return moved
     }
 
-    private static func bestMatch(for layout: WindowLayout,
-                                  in candidates: [LiveWindow],
-                                  used: Set<UInt>) -> LiveWindow? {
-        func free(_ w: LiveWindow) -> Bool {
-            !used.contains(UInt(bitPattern: ObjectIdentifier(w.element).hashValue))
-        }
-        // 1. Exact title.
-        if !layout.windowTitle.isEmpty,
-           let m = candidates.first(where: { $0.title == layout.windowTitle && free($0) }) {
-            return m
-        }
-        // 2. Window index.
-        if let m = candidates.first(where: { $0.index == layout.windowIndex && free($0) }) {
-            return m
-        }
-        // 3. Any free window of the app.
-        return candidates.first(where: free)
-    }
 }

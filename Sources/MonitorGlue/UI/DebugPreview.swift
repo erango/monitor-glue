@@ -13,6 +13,7 @@ enum DebugPreview {
         if what == "diag" { diag(); return }
         if what == "testmove" { testMove(); return }
         if what == "e2e" { e2e(); return }
+        if what == "simulate" { simulateReconnect(); return }
         if what == "testpoll" {
             // A fresh watcher starts with an empty key, so poll() must notice the currently
             // connected external display and report it — the same path that recovers a
@@ -149,23 +150,82 @@ enum DebugPreview {
         NSApp.terminate(nil)
     }
 
+    /// Reproduce the real complaint without unplugging: shove every window that belongs on the
+    /// external display onto the built-in (shrunk, like macOS does on disconnect), then restore
+    /// and report per-window whether it matched and whether position/size came back exactly.
+    @MainActor private static func simulateReconnect() {
+        let displays = DisplayInfo.liveDisplays()
+        guard let builtin = displays.first(where: { $0.isBuiltin }),
+              let ext = displays.first(where: { !$0.isBuiltin }) else {
+            write("need both a built-in and an external display\n"); NSApp.terminate(nil); return
+        }
+        let key = DisplayInfo.monitorSetKey(for: displays)
+        LayoutCapturer.shared.capture(force: true)   // snapshot the good layout first
+        guard let rec = LayoutStore.shared.record(for: key) else {
+            write("no record for current set\n"); NSApp.terminate(nil); return
+        }
+        var out = "set=\(rec.label) saved=\(rec.windows.count)\n"
+
+        // 1. Simulate the disconnect reshuffle: everything to the built-in, shrunk.
+        for (n, l) in rec.windows.enumerated() {
+            let live = WindowManager.currentWindows().filter { $0.appBundleID == l.appBundleID }
+            guard let w = live.first(where: { $0.index == l.windowIndex }) ?? live.first else { continue }
+            let squeezed = CGRect(x: builtin.bounds.origin.x + CGFloat(20 * n),
+                                  y: builtin.bounds.origin.y + CGFloat(20 * n) + 40,
+                                  width: 900, height: 600)
+            _ = WindowManager.setFrame(w.element, squeezed)
+        }
+        out += "-- after simulated disconnect --\n"
+        for w in WindowManager.currentWindows() where rec.windows.contains(where: { $0.appBundleID == w.appBundleID }) {
+            out += "   \(w.appName) idx=\(w.index) '\(w.title.prefix(20))' \(fmt(w.frame))\n"
+        }
+
+        // 2. Restore.
+        let moved = LayoutRestorer.restore(setKey: key)
+        out += "-- restore moved=\(moved) --\n"
+
+        // 3. Grade every saved layout.
+        let after = WindowManager.currentWindows()
+        var okCount = 0
+        for l in rec.windows {
+            let expected = CGRect(x: ext.bounds.origin.x + l.x, y: ext.bounds.origin.y + l.y,
+                                  width: l.width, height: l.height)
+            let hit = after.first { $0.appBundleID == l.appBundleID && $0.frame.equalish(expected) }
+            let anyOfApp = after.filter { $0.appBundleID == l.appBundleID }
+            if hit != nil { okCount += 1 }
+            out += "  \(hit != nil ? "OK  " : "FAIL") \(l.appName) idx=\(l.windowIndex) '\(l.windowTitle.prefix(18))'\n"
+            out += "       expected \(fmt(expected))\n"
+            for c in anyOfApp {
+                out += "       actual   idx=\(c.index) \(fmt(c.frame)) posOK=\(abs(c.frame.origin.x-expected.origin.x)<3 && abs(c.frame.origin.y-expected.origin.y)<3) sizeOK=\(abs(c.frame.width-expected.width)<3 && abs(c.frame.height-expected.height)<3)\n"
+            }
+        }
+        out += "RESULT \(okCount)/\(rec.windows.count) restored exactly\n"
+        write(out); NSApp.terminate(nil)
+    }
+
+    private static func fmt(_ r: CGRect) -> String {
+        "(\(Int(r.origin.x)),\(Int(r.origin.y)) \(Int(r.width))x\(Int(r.height)))"
+    }
+
     /// Full round-trip check that BOTH size and position are captured and restored:
     /// set a distinctive frame on an external window → capture → move+resize it away →
     /// restore → compare the restored frame against the captured one.
     @MainActor private static func e2e() {
         var out = "trusted=\(AXIsProcessTrusted())\n"
         let displays = DisplayInfo.liveDisplays()
-        guard let ext = displays.first(where: { !$0.isBuiltin }) else {
-            out += "no external display\n"; write(out); NSApp.terminate(nil); return
+        guard let ext = displays.first(where: { !$0.isBuiltin }),
+              let builtin = displays.first(where: { $0.isBuiltin }) else {
+            out += "need both a built-in and an external display\n"; write(out); NSApp.terminate(nil); return
         }
         guard let w = WindowManager.currentWindows().first(where: {
             WindowManager.display(for: $0, in: displays).map { !$0.isBuiltin } ?? false
         }) else { out += "no window on the external display\n"; write(out); NSApp.terminate(nil); return }
 
         let original = w.frame
-        // 1. Distinctive frame (offset 220,180 into the display; 1400x900).
-        let distinctive = CGRect(x: ext.bounds.origin.x + 220, y: ext.bounds.origin.y + 180,
-                                width: 1400, height: 900)
+        // 1. Distinctive frame — deliberately WIDER than the built-in display, which is what
+        //    triggered the clamping bug (a 2560-wide window came back as 1998).
+        let distinctive = CGRect(x: ext.bounds.origin.x, y: ext.bounds.origin.y + 30,
+                                width: ext.bounds.width, height: ext.bounds.height - 30)
         _ = WindowManager.setFrame(w.element, distinctive)
         let placed = WindowManager.frame(of: w.element) ?? .zero
         out += "target=\(w.appName) '\(w.title.prefix(24))'\n1 placed=\(placed)\n"
@@ -178,8 +238,10 @@ enum DebugPreview {
         }
         out += "2 saved rel=(\(Int(saved?.x ?? -1)),\(Int(saved?.y ?? -1))) size=\(Int(saved?.width ?? -1))x\(Int(saved?.height ?? -1))\n"
 
-        // 3. Move + resize away (different position AND different size).
-        _ = WindowManager.setFrame(w.element, CGRect(x: 60, y: 80, width: 700, height: 500))
+        // 3. Move + resize away, onto the small built-in display (what macOS does on disconnect).
+        _ = WindowManager.setFrame(w.element, CGRect(x: builtin.bounds.origin.x + 60,
+                                                     y: builtin.bounds.origin.y + 80,
+                                                     width: 700, height: 500))
         out += "3 disturbed=\(WindowManager.frame(of: w.element) ?? .zero)\n"
 
         // 4. Restore and compare.
@@ -255,5 +317,13 @@ enum DebugPreview {
         win.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
         objc_setAssociatedObject(NSApplication.shared, "mg_preview_win", win, .OBJC_ASSOCIATION_RETAIN)
+    }
+}
+
+extension CGRect {
+    /// Tolerant frame comparison (AX rounds and some apps snap by a pixel or two).
+    func equalish(_ o: CGRect, tol: CGFloat = 3) -> Bool {
+        abs(origin.x - o.origin.x) < tol && abs(origin.y - o.origin.y) < tol &&
+        abs(width - o.width) < tol && abs(height - o.height) < tol
     }
 }

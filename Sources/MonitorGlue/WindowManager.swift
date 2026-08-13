@@ -72,18 +72,36 @@ enum WindowManager {
         return CGRect(origin: point, size: size)
     }
 
-    /// Move + resize a window. Position first, then size (some apps clamp size to current screen).
+    /// Move + resize a window to an exact frame.
+    ///
+    /// A single position-then-size pass is not enough when the window is coming from a
+    /// smaller display: macOS clamps the new size to the screen the window still occupies
+    /// (e.g. a 2560-wide window arrives clamped to 1998 = the built-in's right edge). Moving
+    /// it first, then re-applying the size once it is actually on the target display, lets the
+    /// full size take. Apply position and size repeatedly and verify, since some apps also
+    /// snap the origin when resized.
     @discardableResult
     static func setFrame(_ window: AXUIElement, _ frame: CGRect) -> Bool {
-        var point = frame.origin
-        var size = frame.size
-        guard let posValue = AXValueCreate(.cgPoint, &point),
-              let sizeValue = AXValueCreate(.cgSize, &size) else { return false }
-        let r1 = AXUIElementSetAttributeValue(window, kAXPositionAttribute as CFString, posValue)
-        let r2 = AXUIElementSetAttributeValue(window, kAXSizeAttribute as CFString, sizeValue)
-        // Re-assert position after resize, in case the resize nudged it.
-        AXUIElementSetAttributeValue(window, kAXPositionAttribute as CFString, posValue)
-        return r1 == .success && r2 == .success
+        for _ in 0..<3 {
+            apply(window, position: frame.origin)
+            apply(window, size: frame.size)
+            apply(window, position: frame.origin)
+            apply(window, size: frame.size)
+            if let now = self.frame(of: window), now.matches(frame) { return true }
+        }
+        return self.frame(of: window)?.matches(frame) ?? false
+    }
+
+    private static func apply(_ window: AXUIElement, position: CGPoint) {
+        var p = position
+        guard let v = AXValueCreate(.cgPoint, &p) else { return }
+        AXUIElementSetAttributeValue(window, kAXPositionAttribute as CFString, v)
+    }
+
+    private static func apply(_ window: AXUIElement, size: CGSize) {
+        var s = size
+        guard let v = AXValueCreate(.cgSize, &s) else { return }
+        AXUIElementSetAttributeValue(window, kAXSizeAttribute as CFString, v)
     }
 
     // MARK: Display mapping
@@ -100,5 +118,13 @@ enum WindowManager {
         var value: AnyObject?
         let err = AXUIElementCopyAttributeValue(element, attr as CFString, &value)
         return err == .success ? value : nil
+    }
+}
+
+extension CGRect {
+    /// Frame comparison with a small tolerance — AX rounds, and some apps snap by a pixel.
+    func matches(_ other: CGRect, tolerance: CGFloat = 3) -> Bool {
+        abs(origin.x - other.origin.x) < tolerance && abs(origin.y - other.origin.y) < tolerance &&
+        abs(width - other.width) < tolerance && abs(height - other.height) < tolerance
     }
 }

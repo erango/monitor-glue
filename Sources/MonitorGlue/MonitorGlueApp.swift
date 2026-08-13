@@ -97,8 +97,11 @@ final class AppModel: ObservableObject {
     /// second or two, so a single pass can be undone. Each pass is idempotent.
     private func restoreWithRetries(_ key: String) {
         // Don't let a half-migrated snapshot overwrite the saved layout while restoring.
-        LayoutCapturer.shared.suppressCapture(for: 6.0)
-        for delay in [0.8, 2.0, 3.5] {
+        LayoutCapturer.shared.suppressCapture(for: 16.0)
+        // Spread the passes out: macOS keeps reshuffling for a moment, and apps that were
+        // still launching have no windows to place yet. Passes are idempotent — a window
+        // already in position is left alone.
+        for delay in [0.8, 2.0, 3.5, 6.0, 10.0, 15.0] {
             DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
                 guard self.currentSetKey == key else { return }   // display changed again
                 LayoutRestorer.restore(setKey: key)
