@@ -7,9 +7,12 @@ struct MenuBarContent: View {
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        // Native menus keep their items flush against each other and reserve the breathing
+        // room for the separators, so rows sit in zero-spacing stacks and each divider
+        // carries its own small margin.
+        VStack(alignment: .leading, spacing: 0) {
             header
-            Divider()
+            separator
 
             if permissions.isTrusted {
                 statusBlock
@@ -17,40 +20,51 @@ struct MenuBarContent: View {
                 permissionWarning
             }
 
-            Divider()
+            separator
 
-            MenuRow(title: "Restore windows now", icon: MGIcon.restore,
-                    shortcut: "⌘R", disabled: !canRestore) {
-                model.restoreNow()
+            VStack(alignment: .leading, spacing: 0) {
+                MenuRow(title: "Restore windows now", icon: MGIcon.restore,
+                        shortcut: "⌘R", disabled: !canRestore) {
+                    model.restoreNow()
+                }
+                MenuRow(title: "Open Manager…", icon: MGIcon.manager) {
+                    openWindow(id: "manager")
+                    NSApp.activate(ignoringOtherApps: true)
+                }
             }
-            MenuRow(title: "Open Manager…", icon: MGIcon.manager) {
-                openWindow(id: "manager")
-                NSApp.activate(ignoringOtherApps: true)
-            }
 
-            Divider()
+            separator
 
-            Toggle(isOn: Binding(
-                get: { loginItem.isEnabled },
-                set: { loginItem.setEnabled($0) }
-            )) {
-                Text("Launch at login").font(.system(size: 13, weight: .medium))
-            }
-            .toggleStyle(.checkbox)
-            .padding(.vertical, 2).padding(.horizontal, 8)
+            launchAtLoginRow
 
-            Divider()
+            separator
 
             MenuRow(title: "Quit Monitor Glue", icon: MGIcon.power, shortcut: "⌘Q") {
                 NSApp.terminate(nil)
             }
 
-            Divider()
+            separator
             footer
         }
-        .padding(12)
+        .padding(.vertical, 6)
+        .padding(.horizontal, 10)
         .frame(width: 320)
         .onAppear { model.refreshStatus(); loginItem.refresh() }
+    }
+
+    /// Menu separator: a hairline with the small symmetric margin AppKit uses.
+    private var separator: some View {
+        Divider().padding(.vertical, 5)
+    }
+
+    /// A checkable item, the way AppKit menus do it: an ordinary highlightable row with a
+    /// leading checkmark when on (rather than an embedded checkbox control, which cannot
+    /// highlight on hover and reads as a form field inside a menu).
+    private var launchAtLoginRow: some View {
+        MenuRow(title: "Launch at login", icon: nil,
+                checked: loginItem.isEnabled) {
+            loginItem.setEnabled(!loginItem.isEnabled)
+        }
     }
 
     private var canRestore: Bool {
@@ -127,34 +141,68 @@ struct MenuBarContent: View {
                 Text("Made with ")
                 Text("♥").foregroundStyle(Theme.coral)
                 Text(" by ")
-                Link("@erango", destination: URL(string: "https://github.com/erango")!)
-                    .foregroundStyle(Theme.accent)
+                HoverLink(url: URL(string: "https://github.com/erango")!) { hovering in
+                    Text("@erango")
+                        .foregroundStyle(Theme.accent)
+                        .underline(hovering)
+                }
             }
             .font(.system(size: 11.5))
             .foregroundStyle(.secondary)
 
-            Link(destination: URL(string: "https://ko-fi.com/erango")!) {
+            HoverLink(url: URL(string: "https://ko-fi.com/erango")!) { hovering in
                 HStack(spacing: 7) {
                     MGIcon.kofiCup.frame(width: 17, height: 16)
                     Text("Buy me a coffee").font(.system(size: 12, weight: .semibold))
                 }
                 .foregroundStyle(.white)
                 .padding(.vertical, 6).padding(.horizontal, 14)
-                .background(RoundedRectangle(cornerRadius: 9, style: .continuous).fill(Theme.kofi))
-                .shadow(color: Theme.kofi.opacity(0.4), radius: 4, y: 2)
+                .background(
+                    RoundedRectangle(cornerRadius: 9, style: .continuous)
+                        .fill(Theme.kofi)
+                        .brightness(hovering ? 0.07 : 0)
+                )
+                .shadow(color: Theme.kofi.opacity(hovering ? 0.55 : 0.4),
+                        radius: hovering ? 6 : 4, y: 2)
             }
-            .buttonStyle(.plain)
         }
         .frame(maxWidth: .infinity)
+    }
+}
+
+/// A link that exposes its hover state to its label. SwiftUI's `Link` reports no hover, which
+/// is why the Ko-fi button felt dead; a plain `Button` with `onHover` behaves like the rows.
+///
+/// Deliberately does not touch `NSCursor`: push/pop leaks a stuck pointing-hand cursor
+/// system-wide if the popover closes while the pointer is still inside, and AppKit menus
+/// don't change the cursor anyway.
+private struct HoverLink<Label: View>: View {
+    let url: URL
+    @ViewBuilder let label: (Bool) -> Label
+
+    @State private var hovering = false
+
+    var body: some View {
+        Button {
+            NSWorkspace.shared.open(url)
+        } label: {
+            label(hovering)
+        }
+        .buttonStyle(.plain)
+        .contentShape(Rectangle())
+        .onHover { hovering = $0 }
     }
 }
 
 /// Full-width menu row with accent hover highlight and an optional trailing shortcut.
 private struct MenuRow: View {
     let title: String
-    let icon: SVGIcon
+    /// Leading glyph. `nil` for checkable items, which use the checkmark slot instead.
+    let icon: SVGIcon?
     var shortcut: String? = nil
     var disabled: Bool = false
+    /// When non-nil the row is checkable and shows a checkmark in the leading slot when true.
+    var checked: Bool? = nil
     let action: () -> Void
 
     @State private var hovering = false
@@ -162,7 +210,7 @@ private struct MenuRow: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: 9) {
-                icon.frame(width: 14, height: 14).frame(width: 17)
+                leading.frame(width: 17)
                 Text(title).font(.system(size: 13, weight: .medium))
                 Spacer(minLength: 8)
                 if let shortcut {
@@ -171,7 +219,8 @@ private struct MenuRow: View {
             }
             .foregroundStyle(disabled ? AnyShapeStyle(.tertiary)
                              : (hovering ? AnyShapeStyle(.white) : AnyShapeStyle(.primary)))
-            .padding(.vertical, 6).padding(.horizontal, 8)
+            // ~22pt tall, matching an AppKit menu item.
+            .padding(.vertical, 4).padding(.horizontal, 8)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(
                 RoundedRectangle(cornerRadius: 6, style: .continuous)
@@ -182,5 +231,16 @@ private struct MenuRow: View {
         .buttonStyle(.plain)
         .disabled(disabled)
         .onHover { hovering = $0 && !disabled }
+    }
+
+    @ViewBuilder
+    private var leading: some View {
+        if let icon {
+            icon.frame(width: 14, height: 14)
+        } else if let checked {
+            Image(systemName: "checkmark")
+                .font(.system(size: 11, weight: .semibold))
+                .opacity(checked ? 1 : 0)
+        }
     }
 }
