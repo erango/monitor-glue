@@ -79,5 +79,6 @@ final class LayoutCapturer {
             displays: DisplayInfo.records(for: displays),
             windows: layouts
         )
+        Log.write("captured \(layouts.count) window(s) for \(externals.map { $0.localizedName }.joined(separator: " + "))")
     }
 }

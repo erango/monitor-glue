@@ -88,7 +88,8 @@ final class AppModel: ObservableObject {
         currentSetKey = key
         LayoutCapturer.shared.currentSetKey = key
         let known = !key.isEmpty && LayoutStore.shared.record(for: key) != nil
-        NSLog("MonitorGlue: monitor set changed → '\(key.isEmpty ? "built-in only" : key)' known=\(known)")
+        let names = DisplayInfo.externalDisplays().map { $0.localizedName }.joined(separator: " + ")
+        Log.write("DISPLAY SET CHANGED → \(key.isEmpty ? "built-in only" : names) key=\(key.prefix(8)) known=\(known)")
         if known { restoreWithRetries(key) }
         refreshStatus()
     }

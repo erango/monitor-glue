@@ -6,8 +6,14 @@ enum LayoutRestorer {
 
     @discardableResult
     static func restore(setKey: String) -> Int {
-        guard AXIsProcessTrusted() else { return 0 }
-        guard let record = LayoutStore.shared.record(for: setKey) else { return 0 }
+        guard AXIsProcessTrusted() else {
+            Log.write("restore skipped — no Accessibility access")
+            return 0
+        }
+        guard let record = LayoutStore.shared.record(for: setKey) else {
+            Log.write("restore skipped — no saved layout for set '\(setKey)'")
+            return 0
+        }
 
         let displays = DisplayInfo.liveDisplays()
         let liveByBundle = Dictionary(grouping: WindowManager.currentWindows(), by: { $0.appBundleID })
@@ -30,41 +36,63 @@ enum LayoutRestorer {
             (liveByBundle[bundleID] ?? []).filter { !usedElements.contains(token($0)) }
         }
 
+        var matchedBy: [Int: String] = [:]
+
         // Pass 1: exact, non-empty title match.
         for (i, layout) in restorable.enumerated() where assignment[i] == nil {
             guard !layout.windowTitle.isEmpty else { continue }
             if let w = available(layout.appBundleID).first(where: { $0.title == layout.windowTitle }) {
-                claim(i, w)
+                claim(i, w); matchedBy[i] = "title"
             }
         }
         // Pass 2: same window index within the app.
         for (i, layout) in restorable.enumerated() where assignment[i] == nil {
             if let w = available(layout.appBundleID).first(where: { $0.index == layout.windowIndex }) {
-                claim(i, w)
+                claim(i, w); matchedBy[i] = "index"
             }
         }
         // Pass 3: any remaining window of that app.
         for (i, layout) in restorable.enumerated() where assignment[i] == nil {
-            if let w = available(layout.appBundleID).first { claim(i, w) }
+            if let w = available(layout.appBundleID).first { claim(i, w); matchedBy[i] = "fallback" }
         }
 
+        // Retry passes are usually no-ops; log those as one line so real events stay visible.
+        var details: [String] = []
+        var alreadyInPlace = 0
         var moved = 0
         for (i, layout) in restorable.enumerated() {
-            guard let win = assignment[i], let disp = displaysByUUID[layout.displayUUID] else { continue }
+            guard let disp = displaysByUUID[layout.displayUUID] else { continue }
             // Saved coords are relative to the display origin → map to its current position.
             let target = CGRect(x: disp.bounds.origin.x + layout.x,
                                 y: disp.bounds.origin.y + layout.y,
                                 width: layout.width, height: layout.height)
-            // Already in place (a retry pass) — nothing to do.
-            if win.frame.matches(target) { moved += 1; continue }
-            if WindowManager.setFrame(win.element, target) { moved += 1 }
+            guard let win = assignment[i] else {
+                details.append("  MISS \(layout.appName) idx=\(layout.windowIndex) '\(layout.windowTitle.prefix(28))' — no open window to place")
+                continue
+            }
+            if win.frame.matches(target) {
+                moved += 1
+                alreadyInPlace += 1
+                continue
+            }
+            let ok = WindowManager.setFrame(win.element, target)
+            let actual = WindowManager.frame(of: win.element) ?? .zero
+            if ok { moved += 1 }
+            details.append("  \(ok ? "OK  " : "BAD ") \(layout.appName) idx=\(layout.windowIndex) via=\(matchedBy[i] ?? "?") '\(win.title.prefix(24))' want=\(str(target)) got=\(str(actual))")
         }
-        let unmatched = restorable.count - assignment.count
-        if unmatched > 0 {
-            NSLog("MonitorGlue: \(unmatched) saved window(s) had no matching open window yet")
+
+        if details.isEmpty {
+            Log.write("restore '\(record.label)': nothing to do — \(alreadyInPlace)/\(restorable.count) already in place")
+        } else {
+            Log.write("restore '\(record.label)': \(record.windows.count) saved, \(restorable.count) on present displays, \(assignment.count) matched, \(alreadyInPlace) already in place")
+            details.forEach { Log.write($0) }
+            Log.write("restore done: \(moved)/\(restorable.count) placed")
         }
-        NSLog("MonitorGlue: restore for '\(record.label)' — moved \(moved)/\(record.windows.count) saved window(s)")
         return moved
+    }
+
+    private static func str(_ r: CGRect) -> String {
+        "(\(Int(r.origin.x)),\(Int(r.origin.y)) \(Int(r.width))x\(Int(r.height)))"
     }
 
 }
