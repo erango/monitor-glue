@@ -71,6 +71,18 @@ final class AppModel: ObservableObject {
         watcher.start()
         currentSetKey = watcher.currentKey
         LayoutCapturer.shared.currentSetKey = currentSetKey
+
+        let known = !currentSetKey.isEmpty && LayoutStore.shared.record(for: currentSetKey) != nil
+        let names = DisplayInfo.externalDisplays().map { $0.localizedName }.joined(separator: " + ")
+        Log.write("LAUNCHED → \(currentSetKey.isEmpty ? "built-in only" : names) known=\(known)")
+
+        // Restore BEFORE the capturer takes its first snapshot. Launching after a monitor was
+        // connected (app quit, dock, reopen) looks exactly like a fresh connect: macOS has
+        // already dumped the windows onto the built-in display. Capturing that state first
+        // would overwrite the saved layout with the half-migrated one, so restore — which
+        // suppresses capture while it runs — has to go first.
+        if known { restoreWithRetries(currentSetKey) }
+
         LayoutCapturer.shared.start()
 
         // Poll as a safety net for missed display-reconfiguration events (sleep/wake, dock
@@ -79,8 +91,6 @@ final class AppModel: ObservableObject {
             self?.watcher.poll()
         }
 
-        // Restore on launch if we already know this set.
-        if !currentSetKey.isEmpty { restoreWithRetries(currentSetKey) }
         refreshStatus()
     }
 

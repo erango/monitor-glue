@@ -14,6 +14,7 @@ enum DebugPreview {
         if what == "testmove" { testMove(); return }
         if what == "e2e" { e2e(); return }
         if what == "simulate" { simulateReconnect(); return }
+        if what == "scatter" { scatter(); return }
         if what == "testpoll" {
             // A fresh watcher starts with an empty key, so poll() must notice the currently
             // connected external display and report it — the same path that recovers a
@@ -148,6 +149,36 @@ enum DebugPreview {
         let path = ProcessInfo.processInfo.environment["MG_DIAG_OUT"] ?? "/tmp/mg_diag.txt"
         try? out.write(toFile: path, atomically: true, encoding: .utf8)
         NSApp.terminate(nil)
+    }
+
+    /// Mimic what macOS leaves behind after a reconnect, WITHOUT capturing: most saved windows
+    /// shoved onto the built-in display, one left on the external. Used to test what the app
+    /// does when it is launched into that state (quit → connect monitor → open).
+    @MainActor private static func scatter() {
+        let displays = DisplayInfo.liveDisplays()
+        guard let builtin = displays.first(where: { $0.isBuiltin }) else {
+            write("no built-in display\n"); NSApp.terminate(nil); return
+        }
+        let key = DisplayInfo.monitorSetKey(for: displays)
+        guard let rec = LayoutStore.shared.record(for: key) else {
+            write("no record for current set\n"); NSApp.terminate(nil); return
+        }
+        var out = "scattering \(rec.windows.count) saved window(s) of '\(rec.label)'\n"
+        let live = WindowManager.currentWindows()
+        for (n, l) in rec.windows.enumerated() {
+            let cands = live.filter { $0.appBundleID == l.appBundleID }
+            guard let w = cands.first(where: { $0.index == l.windowIndex }) ?? cands.first else { continue }
+            if n == 0 {
+                out += "  leaving \(l.appName) idx=\(l.windowIndex) on the external display\n"
+                continue
+            }
+            let squeezed = CGRect(x: builtin.bounds.origin.x + CGFloat(30 * n),
+                                  y: builtin.bounds.origin.y + CGFloat(30 * n) + 40,
+                                  width: 900, height: 600)
+            _ = WindowManager.setFrame(w.element, squeezed)
+            out += "  moved \(l.appName) idx=\(l.windowIndex) to built-in \(fmt(squeezed))\n"
+        }
+        write(out); NSApp.terminate(nil)
     }
 
     /// Reproduce the real complaint without unplugging: shove every window that belongs on the
