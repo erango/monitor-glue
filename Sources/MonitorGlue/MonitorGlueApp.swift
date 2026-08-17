@@ -62,6 +62,7 @@ final class AppModel: ObservableObject {
     private var pollTimer: Timer?
     /// Set while a restore for this monitor set has not yet placed every saved window.
     private var restorePendingKey: String?
+    private var recheckDebounce: DispatchWorkItem?
 
     func start() {
         Permissions.shared.refresh()
@@ -70,7 +71,11 @@ final class AppModel: ObservableObject {
         watcher.onChange = { [weak self] key in
             self?.handleSetChange(key)
         }
+        watcher.onGeometryChange = { [weak self] in
+            self?.recheckLayout(reason: "display geometry changed")
+        }
         watcher.start()
+        observeWakeEvents()
         currentSetKey = watcher.currentKey
         LayoutCapturer.shared.currentSetKey = currentSetKey
 
@@ -94,6 +99,42 @@ final class AppModel: ObservableObject {
         }
 
         refreshStatus()
+    }
+
+    /// Waking is when layouts are most likely to be wrong and least likely to be noticed: the
+    /// displays may come back in a different arrangement, and the Accessibility API can report
+    /// no windows for a while, which is how a restore silently placed nothing before.
+    private func observeWakeEvents() {
+        let center = NSWorkspace.shared.notificationCenter
+        let events: [(Notification.Name, String)] = [
+            (NSWorkspace.didWakeNotification, "system wake"),
+            (NSWorkspace.screensDidWakeNotification, "screens wake"),
+            (NSWorkspace.sessionDidBecomeActiveNotification, "session active"),
+        ]
+        for (name, reason) in events {
+            center.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+                self?.recheckLayout(reason: reason)
+            }
+        }
+    }
+
+    /// Re-apply the saved layout for whatever is connected now. Safe to call for any reason:
+    /// restore is idempotent, so when everything is already in place this costs one log line.
+    private func recheckLayout(reason: String) {
+        recheckDebounce?.cancel()
+        let work = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            self.watcher.poll()          // a set change takes priority and handles itself
+            let key = self.currentSetKey
+            guard !key.isEmpty, LayoutStore.shared.record(for: key) != nil else { return }
+            guard self.restorePendingKey != key else { return }   // a restore is already running
+            Log.write("RECHECK (\(reason)) → re-applying layout for key=\(key.prefix(8))")
+            self.restoreWithRetries(key)
+        }
+        recheckDebounce = work
+        // Wake arrives as a burst (system wake, then screens, then session); coalesce them, and
+        // give the displays a moment to settle before reading their geometry.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5, execute: work)
     }
 
     private func handleSetChange(_ key: String) {

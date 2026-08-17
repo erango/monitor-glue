@@ -8,12 +8,21 @@ final class DisplayWatcher {
     /// Called on the main thread with the new external-monitor-set key (may be "").
     var onChange: ((String) -> Void)?
 
+    /// Called when the same displays are still connected but their geometry changed — opening
+    /// the lid (the built-in display appears, shifting the external's origin), a resolution
+    /// change, or a monitor waking up. The set key is unchanged in those cases, since it only
+    /// covers which external displays are attached, so `onChange` would not fire.
+    var onGeometryChange: (() -> Void)?
+
     private(set) var currentKey: String = ""
+    private var currentGeometry: String = ""
     private var debounce: DispatchWorkItem?
     private var registered = false
 
     func start() {
-        currentKey = DisplayInfo.monitorSetKey(for: DisplayInfo.liveDisplays())
+        let displays = DisplayInfo.liveDisplays()
+        currentKey = DisplayInfo.monitorSetKey(for: displays)
+        currentGeometry = Self.geometrySignature(displays)
 
         NotificationCenter.default.addObserver(
             self, selector: #selector(screenParamsChanged),
@@ -50,9 +59,28 @@ final class DisplayWatcher {
     }
 
     private func reevaluate() {
-        let key = DisplayInfo.monitorSetKey(for: DisplayInfo.liveDisplays())
-        guard key != currentKey else { return }
-        currentKey = key
-        onChange?(key)
+        let displays = DisplayInfo.liveDisplays()
+        let key = DisplayInfo.monitorSetKey(for: displays)
+        let geometry = Self.geometrySignature(displays)
+
+        if key != currentKey {
+            currentKey = key
+            currentGeometry = geometry
+            onChange?(key)
+            return
+        }
+        if geometry != currentGeometry {
+            currentGeometry = geometry
+            onGeometryChange?()
+        }
+    }
+
+    /// Every display's identity and frame — changes when the lid opens, a display wakes, or a
+    /// resolution changes, even though the set of attached external displays is the same.
+    private static func geometrySignature(_ displays: [LiveDisplay]) -> String {
+        displays
+            .map { "\($0.uuid):\(Int($0.bounds.origin.x)),\(Int($0.bounds.origin.y)),\(Int($0.bounds.width)),\(Int($0.bounds.height))" }
+            .sorted()
+            .joined(separator: "|")
     }
 }

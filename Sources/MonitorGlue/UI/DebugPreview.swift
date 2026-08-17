@@ -16,6 +16,42 @@ enum DebugPreview {
         if what == "simulate" { simulateReconnect(); return }
         if what == "scatter" { scatter(); return }
         if what == "fullsize" { fullsize(); return }
+        if what == "testwake" {
+            // Start the real app model, then post the wake notification AppKit would post, and
+            // let the log show whether the recheck ran. Verifies the observers are wired and the
+            // burst debounce works, without sleeping the displays.
+            AppModel.shared.start()
+            let center = NSWorkspace.shared.notificationCenter
+            DispatchQueue.main.asyncAfter(deadline: .now() + 25) {
+                Log.write("--- posting synthetic wake burst ---")
+                center.post(name: NSWorkspace.didWakeNotification, object: nil)
+                center.post(name: NSWorkspace.screensDidWakeNotification, object: nil)
+                center.post(name: NSWorkspace.sessionDidBecomeActiveNotification, object: nil)
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 32) {
+                write("posted wake burst; see monitor-glue.log\n")
+                NSApp.terminate(nil)
+            }
+            return
+        }
+        if what == "testgeometry" {
+            // A fresh watcher has an empty key AND empty geometry, so the first poll reports a
+            // set change. After start() both are primed, so a poll with nothing changed must be
+            // silent — that silence is what makes the wake/lid recheck cheap.
+            let w = DisplayWatcher()
+            var changes: [String] = []
+            w.onChange = { changes.append("setChange(\($0.prefix(8)))") }
+            w.onGeometryChange = { changes.append("geometryChange") }
+            w.start()
+            w.poll()
+            w.poll()
+            var out = "after start + 2 polls with no change: \(changes.isEmpty ? "silent (correct)" : changes.joined(separator: ","))\n"
+            // Prove the signature actually distinguishes arrangements: clamshell (external at
+            // origin) vs lid open (built-in present, external shifted) must differ.
+            let real = DisplayInfo.liveDisplays()
+            out += "displays now: \(real.map { "\($0.localizedName)@\(Int($0.bounds.origin.x)),\(Int($0.bounds.origin.y))" }.joined(separator: " | "))\n"
+            write(out); NSApp.terminate(nil); return
+        }
         if what == "testpoll" {
             // A fresh watcher starts with an empty key, so poll() must notice the currently
             // connected external display and report it — the same path that recovers a
