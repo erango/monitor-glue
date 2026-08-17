@@ -4,15 +4,24 @@ import AppKit
 /// Matching is best-effort: bundle ID is required, then exact title, then window index.
 enum LayoutRestorer {
 
+    /// Result of one restore pass. `missing` counts saved windows that had no open window to
+    /// place — the signal that the layout on screen is not yet the saved one, so the caller
+    /// should keep retrying and must not let capture overwrite the saved layout.
+    struct Outcome {
+        var placed: Int = 0
+        var missing: Int = 0
+        var isComplete: Bool { missing == 0 }
+    }
+
     @discardableResult
-    static func restore(setKey: String) -> Int {
+    static func restore(setKey: String) -> Outcome {
         guard AXIsProcessTrusted() else {
             Log.write("restore skipped — no Accessibility access")
-            return 0
+            return Outcome()
         }
         guard let record = LayoutStore.shared.record(for: setKey) else {
             Log.write("restore skipped — no saved layout for set '\(setKey)'")
-            return 0
+            return Outcome()
         }
 
         let displays = DisplayInfo.liveDisplays()
@@ -81,14 +90,15 @@ enum LayoutRestorer {
             details.append("  \(ok ? "OK  " : "BAD ") \(layout.appName) idx=\(layout.windowIndex) via=\(matchedBy[i] ?? "?") '\(win.title.prefix(24))' want=\(str(target)) got=\(str(actual))")
         }
 
+        let missing = restorable.count - assignment.count
         if details.isEmpty {
             Log.write("restore '\(record.label)': nothing to do — \(alreadyInPlace)/\(restorable.count) already in place")
         } else {
             Log.write("restore '\(record.label)': \(record.windows.count) saved, \(restorable.count) on present displays, \(assignment.count) matched, \(alreadyInPlace) already in place")
             details.forEach { Log.write($0) }
-            Log.write("restore done: \(moved)/\(restorable.count) placed")
+            Log.write("restore done: \(moved)/\(restorable.count) placed\(missing > 0 ? ", \(missing) still missing" : "")")
         }
-        return moved
+        return Outcome(placed: moved, missing: missing)
     }
 
     private static func str(_ r: CGRect) -> String {

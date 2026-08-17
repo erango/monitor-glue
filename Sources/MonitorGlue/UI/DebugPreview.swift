@@ -15,6 +15,7 @@ enum DebugPreview {
         if what == "e2e" { e2e(); return }
         if what == "simulate" { simulateReconnect(); return }
         if what == "scatter" { scatter(); return }
+        if what == "fullsize" { fullsize(); return }
         if what == "testpoll" {
             // A fresh watcher starts with an empty key, so poll() must notice the currently
             // connected external display and report it — the same path that recovers a
@@ -39,7 +40,7 @@ enum DebugPreview {
                     out += "  layout \(l.appName) idx=\(l.windowIndex) '\(l.windowTitle.prefix(24))' -> liveCandidates=\(cands.count)\n"
                 }
             }
-            let moved = LayoutRestorer.restore(setKey: key)
+            let moved = LayoutRestorer.restore(setKey: key).placed
             out += "restore moved=\(moved)\n"
             write(out); NSApp.terminate(nil); return
         }
@@ -151,6 +152,36 @@ enum DebugPreview {
         NSApp.terminate(nil)
     }
 
+    /// Repair aid: fill the external display with every window that belongs to it (below the
+    /// menu bar). Used to put a layout back after a failed restore left windows at built-in
+    /// sizes; the app's normal capture then records the corrected layout.
+    @MainActor private static func fullsize() {
+        let displays = DisplayInfo.liveDisplays()
+        guard let ext = displays.first(where: { !$0.isBuiltin }) else {
+            write("no external display\n"); NSApp.terminate(nil); return
+        }
+        let key = DisplayInfo.monitorSetKey(for: displays)
+        guard let rec = LayoutStore.shared.record(for: key) else {
+            write("no record for current set\n"); NSApp.terminate(nil); return
+        }
+        let target = CGRect(x: ext.bounds.origin.x, y: ext.bounds.origin.y + 30,
+                            width: ext.bounds.width, height: ext.bounds.height - 30)
+        var out = "filling \(ext.localizedName) → \(fmt(target))\n"
+        let live = WindowManager.currentWindows()
+        var used = Set<Int>()
+        for l in rec.windows {
+            let cands = live.enumerated().filter { $0.element.appBundleID == l.appBundleID && !used.contains($0.offset) }
+            guard let pick = cands.first(where: { $0.element.index == l.windowIndex }) ?? cands.first else {
+                out += "  no open window for \(l.appName) idx=\(l.windowIndex)\n"; continue
+            }
+            used.insert(pick.offset)
+            let ok = WindowManager.setFrame(pick.element.element, target)
+            let got = WindowManager.frame(of: pick.element.element) ?? .zero
+            out += "  \(ok ? "OK  " : "BAD ") \(l.appName) idx=\(l.windowIndex) '\(pick.element.title.prefix(22))' → \(fmt(got))\n"
+        }
+        write(out); NSApp.terminate(nil)
+    }
+
     /// Mimic what macOS leaves behind after a reconnect, WITHOUT capturing: most saved windows
     /// shoved onto the built-in display, one left on the external. Used to test what the app
     /// does when it is launched into that state (quit → connect monitor → open).
@@ -212,7 +243,7 @@ enum DebugPreview {
         }
 
         // 2. Restore.
-        let moved = LayoutRestorer.restore(setKey: key)
+        let moved = LayoutRestorer.restore(setKey: key).placed
         out += "-- restore moved=\(moved) --\n"
 
         // 3. Grade every saved layout.
@@ -276,7 +307,7 @@ enum DebugPreview {
         out += "3 disturbed=\(WindowManager.frame(of: w.element) ?? .zero)\n"
 
         // 4. Restore and compare.
-        let moved = LayoutRestorer.restore(setKey: key)
+        let moved = LayoutRestorer.restore(setKey: key).placed
         let after = WindowManager.frame(of: w.element) ?? .zero
         out += "4 restored=\(after) moved=\(moved)\n"
         let posOK = abs(after.origin.x - placed.origin.x) < 3 && abs(after.origin.y - placed.origin.y) < 3

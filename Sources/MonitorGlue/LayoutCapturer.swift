@@ -21,6 +21,11 @@ final class LayoutCapturer {
         suppressedUntil = Date().addingTimeInterval(seconds)
     }
 
+    /// Clear any suppression immediately.
+    func resumeCapture() {
+        suppressedUntil = .distantPast
+    }
+
     func start() {
         timer?.invalidate()
         timer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
