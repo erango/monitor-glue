@@ -240,7 +240,7 @@ private struct MenuRow: View {
         Button(action: action) {
             HStack(spacing: 9) {
                 leading.frame(width: 17)
-                Text(title).font(.system(size: 13, weight: .medium))
+                Text(title).font(.system(size: 13))
                 Spacer(minLength: 8)
                 if let shortcut {
                     Text(shortcut).font(.system(size: 11)).opacity(0.55)
