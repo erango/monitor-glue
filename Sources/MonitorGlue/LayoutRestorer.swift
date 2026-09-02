@@ -4,6 +4,11 @@ import AppKit
 /// Matching is best-effort: bundle ID is required, then exact title, then window index.
 enum LayoutRestorer {
 
+    /// Last logged outcome and how many identical ones followed it. Retries now run several
+    /// times a second, and an unchanged failure repeated 25 times is noise, not information.
+    private static var lastSignature = ""
+    private static var suppressedRepeats = 0
+
     /// Result of one restore pass. `missing` counts saved windows that had no open window to
     /// place — the signal that the layout on screen is not yet the saved one, so the caller
     /// should keep retrying and must not let capture overwrite the saved layout.
@@ -25,7 +30,8 @@ enum LayoutRestorer {
         }
 
         let displays = DisplayInfo.liveDisplays()
-        let liveByBundle = Dictionary(grouping: WindowManager.currentWindows(), by: { $0.appBundleID })
+        let live = WindowManager.currentWindows()
+        let liveByBundle = Dictionary(grouping: live, by: { $0.appBundleID })
         // Only restore to displays that are actually present now, keyed by UUID.
         let displaysByUUID = Dictionary(uniqueKeysWithValues: displays.map { ($0.uuid, $0) })
 
@@ -91,10 +97,23 @@ enum LayoutRestorer {
         }
 
         let missing = restorable.count - assignment.count
+
+        // Collapse a run of identical attempts into one line plus a count.
+        let signature = "\(setKey)|\(assignment.count)|\(moved)|\(missing)|\(details.count)"
+        if signature == lastSignature, missing > 0 {
+            suppressedRepeats += 1
+            return Outcome(placed: moved, missing: missing)
+        }
+        if suppressedRepeats > 0 {
+            Log.write("  (\(suppressedRepeats) further identical attempt(s))")
+            suppressedRepeats = 0
+        }
+        lastSignature = signature
+
         if details.isEmpty {
             Log.write("restore '\(record.label)': nothing to do — \(alreadyInPlace)/\(restorable.count) already in place")
         } else {
-            Log.write("restore '\(record.label)': \(record.windows.count) saved, \(restorable.count) on present displays, \(assignment.count) matched, \(alreadyInPlace) already in place")
+            Log.write("restore '\(record.label)': \(record.windows.count) saved, \(restorable.count) on present displays, \(assignment.count) matched, \(alreadyInPlace) already in place; AX reported \(live.count) window(s) across \(liveByBundle.count) app(s)")
             details.forEach { Log.write($0) }
             Log.write("restore done: \(moved)/\(restorable.count) placed\(missing > 0 ? ", \(missing) still missing" : "")")
         }

@@ -55,7 +55,7 @@ final class DisplayWatcher {
         debounce?.cancel()
         let work = DispatchWorkItem { [weak self] in self?.reevaluate() }
         debounce = work
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5, execute: work)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3, execute: work)
     }
 
     private func reevaluate() {

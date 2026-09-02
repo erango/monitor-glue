@@ -33,6 +33,12 @@ enum WindowManager {
                   let bundleID = app.bundleIdentifier else { continue }
 
             let appElement = AXUIElementCreateApplication(app.processIdentifier)
+            // Right after a display change apps are busy re-laying out and answer AX slowly.
+            // Without a short timeout one such app blocks this whole pass on the main thread;
+            // with it, a busy app is skipped and picked up by the next retry. Keep it around a second:
+            // a first AX contact with an app needs a few hundred ms, so a tighter cap returns
+            // no windows at all.
+            AXUIElementSetMessagingTimeout(appElement, 1.0)
             guard let windows = copyValue(appElement, kAXWindowsAttribute) as? [AXUIElement] else { continue }
 
             for win in windows {

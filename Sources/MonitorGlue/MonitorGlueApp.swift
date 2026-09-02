@@ -94,7 +94,7 @@ final class AppModel: ObservableObject {
 
         // Poll as a safety net for missed display-reconfiguration events (sleep/wake, dock
         // swaps). Cheap: it only reads the display list and compares the monitor-set key.
-        pollTimer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: true) { [weak self] _ in
+        pollTimer = Timer.scheduledTimer(withTimeInterval: 1.5, repeats: true) { [weak self] _ in
             self?.watcher.poll()
         }
 
@@ -115,6 +115,14 @@ final class AppModel: ObservableObject {
             center.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
                 self?.recheckLayout(reason: reason)
             }
+        }
+
+        // Unlocking is the moment windows become visible to the Accessibility API again, and
+        // it has no NSWorkspace equivalent — it arrives as a distributed notification.
+        DistributedNotificationCenter.default().addObserver(
+            forName: NSNotification.Name("com.apple.screenIsUnlocked"), object: nil, queue: .main
+        ) { [weak self] _ in
+            self?.recheckLayout(reason: "screen unlocked")
         }
     }
 
@@ -157,33 +165,53 @@ final class AppModel: ObservableObject {
     /// the next snapshot overwrites the good saved layout with those sizes.
     private func restoreWithRetries(_ key: String) {
         restorePendingKey = key
-        let schedule: [Double] = [0.8, 2, 3.5, 6, 10, 15, 22, 30, 45, 60, 90, 120, 150, 180]
         LayoutCapturer.shared.suppressCapture(for: 10)
+        attemptRestore(key, elapsed: 0)
+    }
 
-        for delay in schedule {
-            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
-                guard self.currentSetKey == key else { return }        // display changed again
-                guard self.restorePendingKey == key else { return }     // already satisfied
+    /// One restore attempt, rescheduling itself until the layout is on screen. The interval is
+    /// short at first because the usual reason a pass places nothing is that apps are still
+    /// answering the Accessibility API slowly after the display change — polling every few
+    /// hundred milliseconds means we place the windows as soon as they become visible to us,
+    /// instead of waiting out a sparse fixed schedule.
+    private func attemptRestore(_ key: String, elapsed: Double, lockedWait: Bool = false) {
+        // While locked there is nothing to poll for quickly; check back at a calm pace.
+        let interval: Double = lockedWait ? 2.0 : (elapsed < 10 ? 0.4 : (elapsed < 30 ? 1.0 : 3.0))
+        let giveUpAfter = 180.0
 
-                let outcome = LayoutRestorer.restore(setKey: key)
-                if outcome.isComplete {
-                    self.restorePendingKey = nil
-                    // Layout is on screen — let capture take over again shortly.
-                    LayoutCapturer.shared.suppressCapture(for: 2)
-                } else {
-                    // Keep the saved layout protected until the next attempt has had its turn.
-                    LayoutCapturer.shared.suppressCapture(for: 45)
-                }
+        DispatchQueue.main.asyncAfter(deadline: .now() + interval) {
+            guard self.currentSetKey == key else { return }         // display changed again
+            guard self.restorePendingKey == key else { return }      // already satisfied
+
+            if SessionState.isScreenLocked {
+                // Nothing can be placed at the lock screen. Hold the layout protected and do
+                // not let the give-up clock run down, or unlocking ten minutes later would
+                // find capture already recording a layout that was never restored.
+                LayoutCapturer.shared.suppressCapture(for: 45)
+                self.attemptRestore(key, elapsed: elapsed, lockedWait: true)
+                return
             }
-        }
 
-        // Give up eventually, or the app would never record layout changes for this set again
-        // (e.g. the saved app was closed for good).
-        DispatchQueue.main.asyncAfter(deadline: .now() + (schedule.last ?? 180) + 15) {
-            guard self.restorePendingKey == key else { return }
-            self.restorePendingKey = nil
-            LayoutCapturer.shared.resumeCapture()
-            Log.write("restore for key=\(key.prefix(8)) never completed — resuming capture; saved layout may now be overwritten by what is on screen")
+            if LayoutRestorer.restore(setKey: key).isComplete {
+                self.restorePendingKey = nil
+                // Layout is on screen — let capture take over again shortly.
+                LayoutCapturer.shared.suppressCapture(for: 2)
+                return
+            }
+
+            // Keep the saved layout protected until the next attempt has had its turn.
+            LayoutCapturer.shared.suppressCapture(for: 45)
+
+            let next = elapsed + interval
+            guard next < giveUpAfter else {
+                // Give up eventually, or the app would never record layout changes for this set
+                // again (e.g. the saved app was closed for good).
+                self.restorePendingKey = nil
+                LayoutCapturer.shared.resumeCapture()
+                Log.write("restore for key=\(key.prefix(8)) never completed after \(Int(next))s — resuming capture; saved layout may now be overwritten by what is on screen")
+                return
+            }
+            self.attemptRestore(key, elapsed: next)
         }
     }
 
