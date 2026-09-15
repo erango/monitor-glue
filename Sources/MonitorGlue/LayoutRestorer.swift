@@ -9,17 +9,36 @@ enum LayoutRestorer {
     private static var lastSignature = ""
     private static var suppressedRepeats = 0
 
+    /// Layouts already placed during the current restore cycle. Retries keep running while some
+    /// other window is still missing (its app may yet reopen), and without this they would keep
+    /// re-applying the saved frame to windows that are already done - overriding the user every
+    /// few seconds when they resize one.
+    private static var placedThisCycle = Set<String>()
+
+    /// Start a new restore cycle for a display change; forget what was placed in the last one.
+    static func beginCycle() {
+        placedThisCycle.removeAll()
+    }
+
     /// Result of one restore pass. `missing` counts saved windows that had no open window to
     /// place — the signal that the layout on screen is not yet the saved one, so the caller
     /// should keep retrying and must not let capture overwrite the saved layout.
     struct Outcome {
         var placed: Int = 0
+        /// Saved windows with no open window to place - nothing can be done until the app
+        /// reopens, so this keeps the retries running.
         var missing: Int = 0
-        var isComplete: Bool { missing == 0 }
+        /// Matched windows that are not yet sitting at their saved frame. While this is above
+        /// zero we are still actively placing, and capture must not record the half-done state.
+        var pendingPlacements: Int = 0
+        var isComplete: Bool { missing == 0 && pendingPlacements == 0 }
     }
 
+    /// - Parameter enforce: re-apply saved frames even to windows already placed in this cycle.
+    ///   True only for the first seconds after a display change, while macOS is still shuffling
+    ///   windows; afterwards a placed window is left alone so resizing it actually sticks.
     @discardableResult
-    static func restore(setKey: String) -> Outcome {
+    static func restore(setKey: String, enforce: Bool = true) -> Outcome {
         guard AXIsProcessTrusted() else {
             Log.write("restore skipped — no Accessibility access")
             return Outcome()
@@ -75,6 +94,7 @@ enum LayoutRestorer {
         var details: [String] = []
         var alreadyInPlace = 0
         var moved = 0
+        var pendingPlacements = 0
         for (i, layout) in restorable.enumerated() {
             guard let disp = displaysByUUID[layout.displayUUID] else { continue }
             // Saved coords are relative to the display origin → map to its current position.
@@ -85,14 +105,22 @@ enum LayoutRestorer {
                 details.append("  MISS \(layout.appName) idx=\(layout.windowIndex) '\(layout.windowTitle.prefix(28))' — no open window to place")
                 continue
             }
-            if win.frame.matches(target) {
+            // Already done earlier in this cycle: leave it alone, so the user can resize it
+            // while we are still waiting for some other app to reopen.
+            if !enforce, placedThisCycle.contains(layout.id) {
                 moved += 1
                 alreadyInPlace += 1
                 continue
             }
+            if win.frame.matches(target) {
+                moved += 1
+                alreadyInPlace += 1
+                placedThisCycle.insert(layout.id)
+                continue
+            }
             let ok = WindowManager.setFrame(win.element, target)
             let actual = WindowManager.frame(of: win.element) ?? .zero
-            if ok { moved += 1 }
+            if ok { moved += 1; placedThisCycle.insert(layout.id) } else { pendingPlacements += 1 }
             details.append("  \(ok ? "OK  " : "BAD ") \(layout.appName) idx=\(layout.windowIndex) via=\(matchedBy[i] ?? "?") '\(win.title.prefix(24))' want=\(str(target)) got=\(str(actual))")
         }
 
@@ -102,7 +130,7 @@ enum LayoutRestorer {
         let signature = "\(setKey)|\(assignment.count)|\(moved)|\(missing)|\(details.count)"
         if signature == lastSignature, missing > 0 {
             suppressedRepeats += 1
-            return Outcome(placed: moved, missing: missing)
+            return Outcome(placed: moved, missing: missing, pendingPlacements: pendingPlacements)
         }
         if suppressedRepeats > 0 {
             Log.write("  (\(suppressedRepeats) further identical attempt(s))")
@@ -117,7 +145,7 @@ enum LayoutRestorer {
             details.forEach { Log.write($0) }
             Log.write("restore done: \(moved)/\(restorable.count) placed\(missing > 0 ? ", \(missing) still missing" : "")")
         }
-        return Outcome(placed: moved, missing: missing)
+        return Outcome(placed: moved, missing: missing, pendingPlacements: pendingPlacements)
     }
 
     private static func str(_ r: CGRect) -> String {

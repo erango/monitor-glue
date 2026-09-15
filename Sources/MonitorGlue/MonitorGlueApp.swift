@@ -165,6 +165,7 @@ final class AppModel: ObservableObject {
     /// the next snapshot overwrites the good saved layout with those sizes.
     private func restoreWithRetries(_ key: String) {
         restorePendingKey = key
+        LayoutRestorer.beginCycle()
         LayoutCapturer.shared.suppressCapture(for: 10)
         attemptRestore(key, elapsed: 0)
     }
@@ -192,15 +193,25 @@ final class AppModel: ObservableObject {
                 return
             }
 
-            if LayoutRestorer.restore(setKey: key).isComplete {
+            // For the first few seconds keep asserting the saved frames, since macOS is still
+            // shuffling windows. After that, respect windows already placed in this cycle so
+            // resizing one actually sticks while we wait for some other app to reopen.
+            let outcome = LayoutRestorer.restore(setKey: key, enforce: elapsed < 5)
+            if outcome.isComplete {
                 self.restorePendingKey = nil
                 // Layout is on screen — let capture take over again shortly.
                 LayoutCapturer.shared.suppressCapture(for: 2)
                 return
             }
 
-            // Keep the saved layout protected until the next attempt has had its turn.
-            LayoutCapturer.shared.suppressCapture(for: 45)
+            if outcome.pendingPlacements > 0 {
+                // Still actively moving windows — a snapshot now would record a half-done layout.
+                LayoutCapturer.shared.suppressCapture(for: 10)
+            } else {
+                // Everything we can place is placed; the rest is waiting on apps that are not
+                // open. Capture has to run, or a resize made now would never be remembered.
+                LayoutCapturer.shared.resumeCapture()
+            }
 
             let next = elapsed + interval
             guard next < giveUpAfter else {
