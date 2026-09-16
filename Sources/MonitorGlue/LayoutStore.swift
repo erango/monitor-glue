@@ -98,7 +98,12 @@ final class LayoutStore {
     /// or one whose window the user happens to have parked on the built-in screen. Entries not
     /// present in this snapshot are kept as they were, which is also what makes sizes "belong"
     /// to the monitor: only a change made while the window is on that monitor updates it.
-    func upsert(setKey: String, displays: [DisplayInfoRecord], windows: [WindowLayout]) {
+    /// - Parameter evictSlots: "bundleID#index" of windows that exist right now but sit on the
+    ///   built-in display. The user moved them off this monitor deliberately, so stop managing
+    ///   them here. A saved window with no live window at all is left alone - that is an app
+    ///   that simply is not open.
+    func upsert(setKey: String, displays: [DisplayInfoRecord], windows: [WindowLayout],
+                evictSlots: Set<String> = []) {
         queue.sync {
             var record = data.monitorSets[setKey]
                 ?? MonitorSetRecord(key: setKey, displays: displays, lastSeen: Date(), windows: [])
@@ -115,7 +120,26 @@ final class LayoutStore {
                     merged.append(captured)
                 }
             }
+            if !evictSlots.isEmpty {
+                merged.removeAll { evictSlots.contains(slot($0)) }
+            }
             record.windows = merged
+            data.monitorSets[setKey] = record
+        }
+        save()
+    }
+
+    /// Record the frame a window actually ended up with, when the app refused the saved one
+    /// (Slack will not go below its minimum width, for example). Without this the app would
+    /// keep trying to apply a size that can never be reached.
+    func replaceFrame(setKey: String, bundleID: String, windowIndex: Int, with frame: CGRect) {
+        queue.sync {
+            guard var record = data.monitorSets[setKey] else { return }
+            guard let i = record.windows.firstIndex(where: {
+                $0.appBundleID == bundleID && $0.windowIndex == windowIndex
+            }) else { return }
+            record.windows[i].frame = frame
+            record.windows[i].updatedAt = Date()
             data.monitorSets[setKey] = record
         }
         save()

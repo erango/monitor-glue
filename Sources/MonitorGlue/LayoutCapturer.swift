@@ -53,9 +53,17 @@ final class LayoutCapturer {
         var layouts: [WindowLayout] = []
         let now = Date()
 
+        // Windows that exist but sit on the built-in screen: the user moved them off this
+        // monitor on purpose, so their saved entry should go rather than pull them back.
+        var movedToBuiltIn = Set<String>()
+
         for win in live {
             // Only remember windows that live on an external display.
-            guard let disp = WindowManager.display(for: win, in: displays), !disp.isBuiltin else { continue }
+            guard let disp = WindowManager.display(for: win, in: displays) else { continue }
+            guard !disp.isBuiltin else {
+                movedToBuiltIn.insert("\(win.appBundleID)#\(win.index)")
+                continue
+            }
             // Store the position RELATIVE to the display's origin, so restore works even when
             // the display comes back at a different arrangement origin next session.
             layouts.append(WindowLayout(
@@ -74,7 +82,8 @@ final class LayoutCapturer {
         guard !layouts.isEmpty else { return }
 
         // Diff: skip the write if the layout is unchanged (ignore timestamps).
-        let hash = layouts.map { "\($0.appBundleID)\($0.windowIndex)\($0.x)\($0.y)\($0.width)\($0.height)" }
+        let hash = (layouts.map { "\($0.appBundleID)\($0.windowIndex)\($0.x)\($0.y)\($0.width)\($0.height)" }
+            + movedToBuiltIn.sorted().map { "builtin:\($0)" })
             .joined().hashValue
         guard hash != lastSnapshotHash else { return }
         lastSnapshotHash = hash
@@ -82,7 +91,8 @@ final class LayoutCapturer {
         LayoutStore.shared.upsert(
             setKey: setKey,
             displays: DisplayInfo.records(for: displays),
-            windows: layouts
+            windows: layouts,
+            evictSlots: movedToBuiltIn
         )
         Log.write("captured \(layouts.count) window(s) for \(externals.map { $0.localizedName }.joined(separator: " + "))")
     }

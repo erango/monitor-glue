@@ -15,9 +15,16 @@ enum LayoutRestorer {
     /// few seconds when they resize one.
     private static var placedThisCycle = Set<String>()
 
+    /// The frame each layout actually ended up with on the previous attempt. Some apps refuse a
+    /// size outright (Slack will not go narrower than its minimum), so the target can never be
+    /// reached; when two attempts land on the same frame we accept it instead of retrying for
+    /// ever and re-applying it over whatever the user does.
+    private static var lastAchieved = [String: CGRect]()
+
     /// Start a new restore cycle for a display change; forget what was placed in the last one.
     static func beginCycle() {
         placedThisCycle.removeAll()
+        lastAchieved.removeAll()
     }
 
     /// Result of one restore pass. `missing` counts saved windows that had no open window to
@@ -120,8 +127,26 @@ enum LayoutRestorer {
             }
             let ok = WindowManager.setFrame(win.element, target)
             let actual = WindowManager.frame(of: win.element) ?? .zero
-            if ok { moved += 1; placedThisCycle.insert(layout.id) } else { pendingPlacements += 1 }
-            details.append("  \(ok ? "OK  " : "BAD ") \(layout.appName) idx=\(layout.windowIndex) via=\(matchedBy[i] ?? "?") '\(win.title.prefix(24))' want=\(str(target)) got=\(str(actual))")
+            var note = ""
+            if ok {
+                moved += 1
+                placedThisCycle.insert(layout.id)
+            } else if let previous = lastAchieved[layout.id], previous.matches(actual) {
+                // Second attempt landed in exactly the same place: the app will not accept the
+                // saved frame. Take what it gives, remember that, and stop fighting it.
+                moved += 1
+                placedThisCycle.insert(layout.id)
+                let settled = CGRect(x: actual.origin.x - disp.bounds.origin.x,
+                                     y: actual.origin.y - disp.bounds.origin.y,
+                                     width: actual.width, height: actual.height)
+                LayoutStore.shared.replaceFrame(setKey: setKey, bundleID: layout.appBundleID,
+                                                windowIndex: layout.windowIndex, with: settled)
+                note = " — app refused this frame; saving what it allows"
+            } else {
+                lastAchieved[layout.id] = actual
+                pendingPlacements += 1
+            }
+            details.append("  \(ok ? "OK  " : "BAD ") \(layout.appName) idx=\(layout.windowIndex) via=\(matchedBy[i] ?? "?") '\(win.title.prefix(24))' want=\(str(target)) got=\(str(actual))\(note)")
         }
 
         let missing = restorable.count - assignment.count
