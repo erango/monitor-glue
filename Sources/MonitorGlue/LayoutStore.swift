@@ -98,7 +98,7 @@ final class LayoutStore {
     /// or one whose window the user happens to have parked on the built-in screen. Entries not
     /// present in this snapshot are kept as they were, which is also what makes sizes "belong"
     /// to the monitor: only a change made while the window is on that monitor updates it.
-    /// - Parameter evictSlots: "bundleID#index" of windows that exist right now but sit on the
+    /// - Parameter evictSlots: ids of saved windows whose open window is currently on the
     ///   built-in display. The user moved them off this monitor deliberately, so stop managing
     ///   them here. A saved window with no live window at all is left alone - that is an app
     ///   that simply is not open.
@@ -121,7 +121,7 @@ final class LayoutStore {
                 }
             }
             if !evictSlots.isEmpty {
-                merged.removeAll { evictSlots.contains(slot($0)) }
+                merged.removeAll { evictSlots.contains($0.id) }
             }
             record.windows = merged
             data.monitorSets[setKey] = record

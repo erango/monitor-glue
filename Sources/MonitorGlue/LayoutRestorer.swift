@@ -61,41 +61,8 @@ enum LayoutRestorer {
         // Only restore to displays that are actually present now, keyed by UUID.
         let displaysByUUID = Dictionary(uniqueKeysWithValues: displays.map { ($0.uuid, $0) })
 
-        // Assign saved layouts to live windows in passes, strongest signal first. A greedy
-        // per-layout search would let an early layout's weak fallback steal the very window a
-        // later layout matches by title, leaving that one unrestored.
         let restorable = record.windows.filter { displaysByUUID[$0.displayUUID] != nil }
-        var assignment: [Int: LiveWindow] = [:]      // layout offset → window
-        var usedElements = Set<UInt>()
-
-        func token(_ w: LiveWindow) -> UInt { UInt(bitPattern: ObjectIdentifier(w.element).hashValue) }
-        func claim(_ i: Int, _ w: LiveWindow) {
-            assignment[i] = w
-            usedElements.insert(token(w))
-        }
-        func available(_ bundleID: String) -> [LiveWindow] {
-            (liveByBundle[bundleID] ?? []).filter { !usedElements.contains(token($0)) }
-        }
-
-        var matchedBy: [Int: String] = [:]
-
-        // Pass 1: exact, non-empty title match.
-        for (i, layout) in restorable.enumerated() where assignment[i] == nil {
-            guard !layout.windowTitle.isEmpty else { continue }
-            if let w = available(layout.appBundleID).first(where: { $0.title == layout.windowTitle }) {
-                claim(i, w); matchedBy[i] = "title"
-            }
-        }
-        // Pass 2: same window index within the app.
-        for (i, layout) in restorable.enumerated() where assignment[i] == nil {
-            if let w = available(layout.appBundleID).first(where: { $0.index == layout.windowIndex }) {
-                claim(i, w); matchedBy[i] = "index"
-            }
-        }
-        // Pass 3: any remaining window of that app.
-        for (i, layout) in restorable.enumerated() where assignment[i] == nil {
-            if let w = available(layout.appBundleID).first { claim(i, w); matchedBy[i] = "fallback" }
-        }
+        let assignment = LayoutMatcher.match(restorable, to: live)
 
         // Retry passes are usually no-ops; log those as one line so real events stay visible.
         var details: [String] = []
@@ -110,6 +77,14 @@ enum LayoutRestorer {
                                 width: layout.width, height: layout.height)
             guard let win = assignment[i] else {
                 details.append("  MISS \(layout.appName) idx=\(layout.windowIndex) '\(layout.windowTitle.prefix(28))' — no open window to place")
+                continue
+            }
+            // Past the settle phase, a window sitting on the built-in screen is there because
+            // the user put it there - dragging a window to the laptop must stick even while
+            // this cycle is still waiting on some other app. During the settle phase we do move
+            // built-in windows, since that is exactly the pile macOS makes on reconnect.
+            if !enforce, WindowManager.display(for: win, in: displays)?.isBuiltin == true {
+                details.append("  SKIP \(layout.appName) idx=\(layout.windowIndex) '\(win.title.prefix(24))' — user moved it to the built-in screen")
                 continue
             }
             // Already done earlier in this cycle: leave it alone, so the user can resize it
@@ -146,7 +121,7 @@ enum LayoutRestorer {
                 lastAchieved[layout.id] = actual
                 pendingPlacements += 1
             }
-            details.append("  \(ok ? "OK  " : "BAD ") \(layout.appName) idx=\(layout.windowIndex) via=\(matchedBy[i] ?? "?") '\(win.title.prefix(24))' want=\(str(target)) got=\(str(actual))\(note)")
+            details.append("  \(ok ? "OK  " : "BAD ") \(layout.appName) idx=\(layout.windowIndex) via=\(LayoutMatcher.reason(layout, win)) '\(win.title.prefix(24))' want=\(str(target)) got=\(str(actual))\(note)")
         }
 
         let missing = restorable.count - assignment.count

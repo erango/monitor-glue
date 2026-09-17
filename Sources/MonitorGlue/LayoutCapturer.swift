@@ -53,17 +53,24 @@ final class LayoutCapturer {
         var layouts: [WindowLayout] = []
         let now = Date()
 
-        // Windows that exist but sit on the built-in screen: the user moved them off this
-        // monitor on purpose, so their saved entry should go rather than pull them back.
+        // Saved windows the user has moved onto the built-in screen: forget them, rather than
+        // pulling them back to this monitor. Resolved with the same matcher restore uses, so
+        // the two always agree about which open window a saved entry refers to. Keying this on
+        // the window index instead made entries churn, because an app's window indices shift as
+        // its windows come and go.
         var movedToBuiltIn = Set<String>()
+        if let saved = LayoutStore.shared.record(for: setKey)?.windows {
+            let matched = LayoutMatcher.match(saved, to: live)
+            for (i, win) in matched {
+                if WindowManager.display(for: win, in: displays)?.isBuiltin == true {
+                    movedToBuiltIn.insert(saved[i].id)
+                }
+            }
+        }
 
         for win in live {
             // Only remember windows that live on an external display.
-            guard let disp = WindowManager.display(for: win, in: displays) else { continue }
-            guard !disp.isBuiltin else {
-                movedToBuiltIn.insert("\(win.appBundleID)#\(win.index)")
-                continue
-            }
+            guard let disp = WindowManager.display(for: win, in: displays), !disp.isBuiltin else { continue }
             // Store the position RELATIVE to the display's origin, so restore works even when
             // the display comes back at a different arrangement origin next session.
             layouts.append(WindowLayout(
