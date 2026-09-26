@@ -1,3 +1,6 @@
+require 'digest'
+require 'tmpdir'
+
 default_platform(:mac)
 
 platform :mac do
@@ -62,6 +65,24 @@ platform :mac do
     add_git_tag(tag: tag)
     push_to_git_remote(tags: true)
     sh("gh release create #{tag} '#{zip}' --repo erango/monitor-glue --title 'Monitor Glue #{version}' --generate-notes")
+    update_homebrew_cask(version: version, zip: zip)
     UI.success("Released #{tag}: https://github.com/erango/monitor-glue/releases/tag/#{tag}")
+  end
+
+  # Point the Homebrew cask in erango/homebrew-tap at the new release. Works in a fresh
+  # temporary clone so it never depends on, or disturbs, a local checkout.
+  private_lane :update_homebrew_cask do |options|
+    version = options[:version]
+    sha = Digest::SHA256.file(options[:zip]).hexdigest
+    Dir.mktmpdir do |dir|
+      sh("gh repo clone erango/homebrew-tap '#{dir}/tap' -- -q")
+      cask = "#{dir}/tap/Casks/monitor-glue.rb"
+      text = File.read(cask)
+                 .sub(/version "[^"]+"/, %(version "#{version}"))
+                 .sub(/sha256 "[^"]+"/, %(sha256 "#{sha}"))
+      File.write(cask, text)
+      sh("git -C '#{dir}/tap' commit -qam 'Update Monitor Glue to #{version}' && git -C '#{dir}/tap' push -q")
+    end
+    UI.success("Homebrew cask updated to #{version}")
   end
 end

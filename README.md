@@ -38,10 +38,17 @@ puts them back — right monitor, right position, right size — the moment you 
 
 ## Install
 
-1. Download `MonitorGlue.zip` from the [latest release](https://github.com/erango/monitor-glue/releases/latest).
-2. Unzip it and drag **MonitorGlue.app** to your Applications folder.
-3. Open it and grant **Accessibility** access when asked (System Settings → Privacy &
-   Security → Accessibility). This is the only permission it needs.
+With [Homebrew](https://brew.sh):
+
+```bash
+brew install --cask erango/tap/monitor-glue
+```
+
+Or download `MonitorGlue.zip` from the [latest release](https://github.com/erango/monitor-glue/releases/latest),
+unzip it, and drag **MonitorGlue.app** to your Applications folder.
+
+Then open it and grant **Accessibility** access when asked (System Settings → Privacy &
+Security → Accessibility). This is the only permission it needs.
 
 Requires macOS 14 Sonoma or later. The app is signed with a Developer ID and notarized by Apple.
 
@@ -75,9 +82,10 @@ position and size of other apps' windows — never their contents. Everything st
 - **Nothing is restored:** check Accessibility is on for Monitor Glue. If it looks on but the
   app still asks for access, reset it and grant again:
   `tccutil reset Accessibility com.erango.monitorglue`
-- **Something behaved oddly:** the log above records every monitor change and, for each
-  restore, which window matched which saved entry and the frame it got. It's the most useful
-  thing to attach to an issue.
+- **Something behaved oddly:** choose **Report a Bug…** in the menu. It opens a GitHub issue
+  with your setup filled in and shows the log in Finder, ready to attach. The log records every
+  monitor change and, for each restore, which window matched which saved entry and the frame it
+  got — skim it first, since it includes window titles.
 
 ## Build from source
 
