@@ -2,8 +2,8 @@
 # Build MonitorGlue with SPM and assemble a signed .app bundle.
 #
 # Environment:
-#   FLAVOR         direct (default) — GitHub download, Ko-fi link, hardened runtime
-#                  appstore         — Mac App Store, no Ko-fi link, App Sandbox
+#   CONFIG         release (default) — what ships; the test harness is compiled out
+#                  debug             — includes the MG_PREVIEW harness; built into dist/debug/
 #   SIGN_IDENTITY  codesign identity. Unset: the local self-signed identity, else ad-hoc.
 #   BUNDLE_ID      override CFBundleIdentifier (used for side-by-side test builds)
 set -euo pipefail
@@ -12,35 +12,24 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
 APP_NAME="MonitorGlue"
-CONFIG="release"
-FLAVOR="${FLAVOR:-direct}"
+CONFIG="${CONFIG:-release}"
 DIST="$ROOT/dist"
-
-case "$FLAVOR" in
-    direct)
-        SWIFT_FLAGS=()
-        BUILD_PATH="$ROOT/.build"
-        APP="$DIST/$APP_NAME.app"            # unchanged path: the login item points here
-        ENTITLEMENTS="$ROOT/Resources/Direct.entitlements"
-        ;;
-    appstore)
-        SWIFT_FLAGS=(-Xswiftc -DAPP_STORE)
-        BUILD_PATH="$ROOT/.build-appstore"   # separate cache so the flag never leaks across
-        APP="$DIST/appstore/$APP_NAME.app"
-        ENTITLEMENTS="$ROOT/Resources/AppStore.entitlements"
-        ;;
-    *) echo "error: FLAVOR must be direct or appstore (got '$FLAVOR')" >&2; exit 1 ;;
+case "$CONFIG" in
+    release) APP="$DIST/$APP_NAME.app" ;;          # the login item points at this path
+    debug)   APP="$DIST/debug/$APP_NAME.app" ;;    # never mistaken for, or overwrites, the real one
+    *) echo "error: CONFIG must be release or debug (got '$CONFIG')" >&2; exit 1 ;;
 esac
+ENTITLEMENTS="$ROOT/Resources/MonitorGlue.entitlements"
 
 if [[ ! -f "$ROOT/Resources/AppIcon.icns" ]]; then
     echo "==> Generating app icon…"
     "$ROOT/Scripts/make_icon.sh"
 fi
 
-echo "==> Building ($CONFIG, $FLAVOR)…"
-swift build -c "$CONFIG" --build-path "$BUILD_PATH" ${SWIFT_FLAGS[@]+"${SWIFT_FLAGS[@]}"}
+echo "==> Building ($CONFIG)…"
+swift build -c "$CONFIG"
 
-BIN="$(swift build -c "$CONFIG" --build-path "$BUILD_PATH" --show-bin-path)/$APP_NAME"
+BIN="$(swift build -c "$CONFIG" --show-bin-path)/$APP_NAME"
 if [[ ! -f "$BIN" ]]; then
     echo "error: built binary not found at $BIN" >&2
     exit 1

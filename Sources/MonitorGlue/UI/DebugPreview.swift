@@ -1,3 +1,6 @@
+// Development harness: screenshots, sample data and test modes. Compiled into debug builds
+// only (`swift build` without `-c release`), so none of it ships.
+#if DEBUG
 import SwiftUI
 import AppKit
 import ServiceManagement
@@ -116,11 +119,11 @@ enum DebugPreview {
         }
         seedSampleData()
         if what == "menu" { Permissions.shared._setPreviewTrusted(true) }
-        AppModel.shared.currentSetKey = "UUID-DELL|UUID-LG"
+        AppModel.shared.currentSetKey = "UUID-DELL"
         AppModel.shared.refreshStatus()
         // Sample status counts (no live displays in the harness).
-        AppModel.shared.connectedExternalDisplays = 2
-        AppModel.shared.currentSetLabel = "Dell U2720Q + LG HDR 4K"
+        AppModel.shared.connectedExternalDisplays = 1
+        AppModel.shared.currentSetLabel = "Dell U2720Q"
         AppModel.shared.currentSetWindowCount = 5
         if what == "manager" { showManager() }
         if what == "menu" { showMenu() }
@@ -133,12 +136,11 @@ enum DebugPreview {
                          windowTitle: title, windowIndex: idx,
                          x: x, y: y, width: w, height: h, updatedAt: Date(timeIntervalSince1970: 1_780_000_000))
         }
-        let u1 = "UUID-DELL", u2 = "UUID-LG"
+        let u1 = "UUID-DELL", u2 = "UUID-DELL"
         let setA = MonitorSetRecord(
-            key: "\(u1)|\(u2)",
+            key: u1,
             displays: [
                 DisplayInfoRecord(uuid: u1, localizedName: "Dell U2720Q", widthPx: 3840, heightPx: 2160),
-                DisplayInfoRecord(uuid: u2, localizedName: "LG HDR 4K", widthPx: 3840, heightPx: 2160),
             ],
             lastSeen: Date(timeIntervalSince1970: 1_780_000_000),
             windows: [
@@ -172,11 +174,7 @@ enum DebugPreview {
         win.title = "Monitor Glue"
         win.styleMask = [.titled, .closable, .resizable, .fullSizeContentView]
         win.titlebarAppearsTransparent = true
-        win.center()
-        win.isReleasedWhenClosed = false
-        win.makeKeyAndOrderFront(nil)
-        NSApp.activate(ignoringOtherApps: true)
-        objc_setAssociatedObject(NSApplication.shared, "mg_preview_win", win, .OBJC_ASSOCIATION_RETAIN)
+        placeOnBuiltIn(win)
     }
 
     /// Render the menu-bar template glyph onto a white tile at menu-bar scale, then exit.
@@ -415,14 +413,28 @@ enum DebugPreview {
         let view = MenuBarContent()
             .environmentObject(AppModel.shared)
             .environmentObject(Permissions.shared)
-            .background(.regularMaterial)
+            .background(VisualEffect())
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .padding(24)   // room for the shadow in screenshots
         let hosting = NSHostingController(rootView: view)
         let win = NSWindow(contentViewController: hosting)
-        win.styleMask = [.titled, .closable, .fullSizeContentView]
-        win.titlebarAppearsTransparent = true
-        win.titleVisibility = .hidden
+        win.styleMask = [.borderless]
+        win.isOpaque = false
+        win.backgroundColor = .clear
+        win.hasShadow = false
         win.title = "Monitor Glue Menu"
-        win.center()
+        placeOnBuiltIn(win)
+    }
+
+    /// Screenshots should come out at 2x, so put preview windows on the built-in Retina screen.
+    private static func placeOnBuiltIn(_ win: NSWindow) {
+        let builtIn = NSScreen.screens.first {
+            ($0.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)
+                .map { CGDisplayIsBuiltin(CGDirectDisplayID(truncating: $0)) != 0 } ?? false
+        } ?? NSScreen.main
+        if let f = builtIn?.visibleFrame {
+            win.setFrameOrigin(NSPoint(x: f.midX - win.frame.width / 2, y: f.midY - win.frame.height / 2))
+        }
         win.isReleasedWhenClosed = false
         win.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
@@ -437,3 +449,15 @@ extension CGRect {
         abs(width - o.width) < tol && abs(height - o.height) < tol
     }
 }
+/// The frosted material the real menu-bar popover uses.
+private struct VisualEffect: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSVisualEffectView {
+        let v = NSVisualEffectView()
+        v.material = .menu
+        v.blendingMode = .behindWindow
+        v.state = .active
+        return v
+    }
+    func updateNSView(_ nsView: NSVisualEffectView, context: Context) {}
+}
+#endif

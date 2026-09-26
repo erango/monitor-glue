@@ -3,7 +3,6 @@ dist/
 .DS_Store
 *.xcuserstate
 Resources/AppIcon.icns
-.build-appstore/
 
 # fastlane: credentials never leave this machine
 fastlane/secrets/

@@ -31,10 +31,12 @@ struct MonitorGlueApp: App {
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)  // No Dock icon.
+        #if DEBUG
         if DebugPreview.requested != nil {
-            DebugPreview.runIfRequested()   // Gated harness — skip live watchers/polling.
+            DebugPreview.runIfRequested()   // Development harness — skip live watchers/polling.
             return
         }
+        #endif
         AppModel.shared.start()
         if !Permissions.shared.isTrusted {
             OnboardingController.shared.show()

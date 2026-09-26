@@ -10,8 +10,10 @@ final class Permissions: ObservableObject {
 
     private var timer: Timer?
 
+    #if DEBUG
     /// Force a trust value for the gated UI preview harness only.
     func _setPreviewTrusted(_ value: Bool) { isTrusted = value }
+    #endif
 
     /// Re-check trust state (no prompt).
     func refresh() {

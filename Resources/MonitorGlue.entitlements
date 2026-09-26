@@ -2,7 +2,8 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <!-- Developer ID build: hardened runtime, not sandboxed. The Accessibility API needs no
+    <!-- Hardened runtime, not sandboxed (the App Sandbox blocks the Accessibility API this app
+         needs to see and move other apps' windows). The Accessibility API needs no
          entitlement here; the user grants it in System Settings. -->
 </dict>
 </plist>
