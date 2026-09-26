@@ -78,7 +78,29 @@ final class LayoutStore {
         guard let raw = try? Data(contentsOf: url) else { return LayoutStoreData() }
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
-        return (try? decoder.decode(LayoutStoreData.self, from: raw)) ?? LayoutStoreData()
+        var loaded = (try? decoder.decode(LayoutStoreData.self, from: raw)) ?? LayoutStoreData()
+        for (key, record) in loaded.monitorSets { loaded.monitorSets[key] = pruned(record) }
+        return loaded
+    }
+
+    /// A saved window is forgotten once it has gone 30 days without being seen on a monitor
+    /// that was itself in use - i.e. its window was closed or moved away for good.
+    ///
+    /// Measured against the monitor set's own `lastSeen`, not the clock: a monitor that simply
+    /// was not plugged in for a month (a holiday) keeps its whole layout, because its windows
+    /// and its `lastSeen` aged together. Captures merge, so without this, closed windows would
+    /// accumulate for ever and every reconnect would spend its full retry window on them.
+    static let staleAfter: TimeInterval = 30 * 24 * 60 * 60
+
+    private static func pruned(_ record: MonitorSetRecord) -> MonitorSetRecord {
+        var record = record
+        let before = record.windows.count
+        record.windows.removeAll { record.lastSeen.timeIntervalSince($0.updatedAt) > staleAfter }
+        let dropped = before - record.windows.count
+        if dropped > 0 {
+            Log.write("forgot \(dropped) window(s) on \(record.label) not seen there for over 30 days")
+        }
+        return record
     }
 
     func save() {
@@ -124,7 +146,7 @@ final class LayoutStore {
                 merged.removeAll { evictSlots.contains($0.id) }
             }
             record.windows = merged
-            data.monitorSets[setKey] = record
+            data.monitorSets[setKey] = LayoutStore.pruned(record)
         }
         save()
     }

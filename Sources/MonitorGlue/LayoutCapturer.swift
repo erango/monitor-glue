@@ -8,6 +8,7 @@ final class LayoutCapturer {
     private var timer: Timer?
     private let interval: TimeInterval = 4.0
     private var lastSnapshotHash: Int = 0
+    private var lastWrite: Date = .distantPast
 
     /// The monitor-set key currently being tracked (set by the app on display changes).
     var currentSetKey: String = ""
@@ -92,8 +93,12 @@ final class LayoutCapturer {
         let hash = (layouts.map { "\($0.appBundleID)\($0.windowIndex)\($0.x)\($0.y)\($0.width)\($0.height)" }
             + movedToBuiltIn.sorted().map { "builtin:\($0)" })
             .joined().hashValue
-        guard hash != lastSnapshotHash else { return }
+        // Skip unchanged snapshots, but still write about once a day: the write refreshes each
+        // window's "last seen" time, which is what keeps a window that simply never moves from
+        // being mistaken for a closed one by the 30-day cleanup.
+        guard hash != lastSnapshotHash || Date().timeIntervalSince(lastWrite) > 24 * 60 * 60 else { return }
         lastSnapshotHash = hash
+        lastWrite = Date()
 
         LayoutStore.shared.upsert(
             setKey: setKey,
