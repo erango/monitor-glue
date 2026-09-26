@@ -14,6 +14,11 @@ enum DebugPreview {
         guard let what = requested else { return }
         if what == "glyph" { dumpMenuBarGlyph(); return }
         if what == "diag" { diag(); return }
+        if what == "bugurl" {
+            let url = BugReport.previewURL()
+            write("length=\(url?.absoluteString.count ?? 0)\n\(url?.absoluteString ?? "nil")\n")
+            NSApp.terminate(nil); return
+        }
         if what == "axprompt" {
             // Ask for Accessibility the way the app does, and report what macOS answered.
             let key = kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String

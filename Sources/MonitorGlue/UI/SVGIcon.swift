@@ -193,4 +193,13 @@ enum MGIcon {
             .init(d: "M6 6l4 4M10 6l-4 4", style: .strokeCurrent(1.3, true)),
         ])
     }
+    /// Report a bug: a small beetle, drawn in the same stroke style as the other menu glyphs.
+    static var bug: SVGIcon {
+        SVGIcon(viewBox: 16, elements: [
+            .init(d: "M5.2 7.6a2.8 2.8 0 0 1 5.6 0v2.6a2.8 2.8 0 0 1-5.6 0Z", style: .strokeCurrent(1.3, true)),
+            .init(d: "M6.3 5.6a1.7 1.7 0 0 1 3.4 0", style: .strokeCurrent(1.3, true)),
+            .init(d: "M8 7.4v5.5", style: .strokeCurrent(1.1, true)),
+            .init(d: "M5.2 8.8H3.2M10.8 8.8h2M5.4 11.2l-1.7 1.2M10.6 11.2l1.7 1.2M5.6 6.6 4.2 5.3M10.4 6.6l1.4-1.3", style: .strokeCurrent(1.2, true)),
+        ])
+    }
 }

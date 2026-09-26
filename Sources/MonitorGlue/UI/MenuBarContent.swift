@@ -40,6 +40,9 @@ struct MenuBarContent: View {
 
             separator
 
+            MenuRow(title: "Report a Bug…", icon: MGIcon.bug,
+                    action: choose { BugReport.open() })
+
             MenuRow(title: "Quit Monitor Glue", icon: MGIcon.power, shortcut: "⌘Q") {
                 NSApp.terminate(nil)
             }

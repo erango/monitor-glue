@@ -7,6 +7,9 @@ enum Log {
     private static let queue = DispatchQueue(label: "com.erango.monitorglue.log")
     private static let maxBytes = 512 * 1024
 
+    /// Where the log lives, for "Report a Bug" to reveal it.
+    static var fileURL: URL { url }
+
     private static let url: URL = {
         let fm = FileManager.default
         let base = (try? fm.url(for: .applicationSupportDirectory, in: .userDomainMask,
