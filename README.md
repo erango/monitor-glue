@@ -8,8 +8,7 @@
 [![Buy me a coffee](https://img.shields.io/badge/Ko--fi-buy%20me%20a%20coffee-29abe0?logo=kofi&logoColor=white)](https://ko-fi.com/erango)
 
 <p align="center">
-  <img src="docs/screenshots/menu.png" width="368" alt="Monitor Glue menu-bar menu">
-  <img src="docs/screenshots/manager.png" width="460" alt="Remembered monitors and windows">
+  <img src="docs/demo.gif" width="720" alt="Unplug the monitor and macOS piles every window onto the laptop; plug it back in and Monitor Glue puts each window back in its place">
 </p>
 
 ## The problem
@@ -35,6 +34,11 @@ puts them back — right monitor, right position, right size — the moment you 
   Monitor Glue takes what the app allows instead of fighting it.
 - **Stays out of the way.** A menu-bar app with no Dock icon. A manager window shows every
   remembered monitor, app and window, and lets you forget any of them.
+
+<p align="center">
+  <img src="docs/screenshots/menu.png" width="368" alt="Monitor Glue menu-bar menu">
+  <img src="docs/screenshots/manager.png" width="460" alt="Remembered monitors and windows">
+</p>
 
 ## Install
 
