@@ -22,4 +22,46 @@ platform :mac do
     ids = Spaceship::ConnectAPI::BundleId.all.map(&:identifier)
     UI.message("Bundle ids: #{ids.empty? ? '(none)' : ids.join(', ')}")
   end
+
+  desc "Create (or download) the Developer ID Application certificate into the login keychain"
+  lane :developer_id_cert do
+    api_key
+    get_certificates(platform: "macos", type: "developer_id_application")
+  end
+
+  desc "Build, sign with Developer ID, notarize, and publish a GitHub release. fastlane release version:1.0.0"
+  lane :release do |options|
+    version = options[:version] || UI.user_error!("Pass a version, e.g. fastlane release version:1.0.0")
+    UI.user_error!("Version must look like 1.2.3") unless version.match?(/\A\d+\.\d+\.\d+\z/)
+    tag = "v#{version}"
+    root = File.expand_path("..", __dir__)
+    app = File.join(root, "dist/MonitorGlue.app")
+    zip = File.join(root, "dist/MonitorGlue.zip")
+
+    ensure_git_status_clean
+    UI.user_error!("Tag #{tag} already exists") if git_tag_exists(tag: tag)
+
+    identity = sh("security find-identity -v -p codesigning | sed -n 's/.*\"\\(Developer ID Application: [^\"]*\\)\".*/\\1/p' | head -1").strip
+    UI.user_error!("No Developer ID Application certificate — run: fastlane developer_id_cert") if identity.empty?
+
+    # Version lives in Info.plist; the build number just counts releases.
+    plist = File.join(root, "Resources/Info.plist")
+    build = sh("git -C #{root} tag -l 'v*' | wc -l").strip.to_i + 1
+    sh("/usr/libexec/PlistBuddy -c 'Set :CFBundleShortVersionString #{version}' -c 'Set :CFBundleVersion #{build}' '#{plist}'")
+
+    sh("cd '#{root}' && SIGN_IDENTITY='#{identity}' ./Scripts/bundle.sh")
+    api_key
+    notarize(package: app, bundle_id: "com.erango.monitorglue",
+             api_key: lane_context[SharedValues::APP_STORE_CONNECT_API_KEY])   # also staples the ticket
+
+    # Prove it passes Gatekeeper the way a downloaded copy will.
+    sh("spctl --assess --type execute --verbose=2 '#{app}'")
+    sh("rm -f '#{zip}' && ditto -c -k --keepParent '#{app}' '#{zip}'")
+
+    git_commit(path: plist, message: "Release #{version}")
+    add_git_tag(tag: tag)
+    push_to_git_remote(tags: true)
+    sh("gh release create #{tag} '#{zip}' --repo erango/monitor-glue --title 'Monitor Glue #{version}' --generate-notes")
+    UI.success("Released #{tag}: https://github.com/erango/monitor-glue/releases/tag/#{tag}")
+  end
 end
