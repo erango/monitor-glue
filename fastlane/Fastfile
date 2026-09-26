@@ -1,0 +1,25 @@
+default_platform(:mac)
+
+platform :mac do
+  # App Store Connect API key. Drop the downloaded AuthKey_<KEY_ID>.p8 into fastlane/secrets/
+  # and put the two ids in fastlane/.env (both gitignored):
+  #   ASC_KEY_ID=XXXXXXXXXX
+  #   ASC_ISSUER_ID=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+  private_lane :api_key do
+    key_id = ENV.fetch("ASC_KEY_ID") { UI.user_error!("Set ASC_KEY_ID in fastlane/.env") }
+    issuer = ENV.fetch("ASC_ISSUER_ID") { UI.user_error!("Set ASC_ISSUER_ID in fastlane/.env") }
+    path = File.expand_path("secrets/AuthKey_#{key_id}.p8", __dir__)
+    UI.user_error!("Missing #{path}") unless File.exist?(path)
+    app_store_connect_api_key(key_id: key_id, issuer_id: issuer, key_filepath: path)
+  end
+
+  desc "Check the API key works: list the team's certificates and bundle ids"
+  lane :verify_api do
+    api_key
+    certs = Spaceship::ConnectAPI::Certificate.all
+    UI.success("API key OK — #{certs.count} certificate(s) on the team:")
+    certs.each { |c| UI.message("  #{c.certificate_type}  #{c.name}  expires #{c.expiration_date}") }
+    ids = Spaceship::ConnectAPI::BundleId.all.map(&:identifier)
+    UI.message("Bundle ids: #{ids.empty? ? '(none)' : ids.join(', ')}")
+  end
+end

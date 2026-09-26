@@ -1,0 +1,3 @@
+# Team and app identity. Credentials live in fastlane/secrets/ (gitignored), never here.
+team_id "GWZUYS277A"
+app_identifier "com.erango.monitorglue"
