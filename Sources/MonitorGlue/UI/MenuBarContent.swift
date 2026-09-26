@@ -177,6 +177,9 @@ struct MenuBarContent: View {
             .font(.system(size: 11.5))
             .foregroundStyle(.secondary)
 
+            // App Store builds omit the tip link: App Review guideline 3.1.1 does not allow
+            // linking out to external payment for tips. The GitHub build keeps it.
+            #if !APP_STORE
             HoverLink(url: URL(string: "https://ko-fi.com/erango")!, onOpen: closeMenu) { hovering in
                 HStack(spacing: 7) {
                     MGIcon.kofiCup.frame(width: 17, height: 16)
@@ -192,6 +195,7 @@ struct MenuBarContent: View {
                 .shadow(color: Theme.kofi.opacity(hovering ? 0.55 : 0.4),
                         radius: hovering ? 6 : 4, y: 2)
             }
+            #endif
         }
         .frame(maxWidth: .infinity)
     }

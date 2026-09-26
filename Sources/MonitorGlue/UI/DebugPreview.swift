@@ -11,6 +11,15 @@ enum DebugPreview {
         guard let what = requested else { return }
         if what == "glyph" { dumpMenuBarGlyph(); return }
         if what == "diag" { diag(); return }
+        if what == "axprompt" {
+            // Ask for Accessibility the way the app does, and report what macOS answered.
+            let key = kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String
+            let trusted = AXIsProcessTrustedWithOptions([key: true] as CFDictionary)
+            let home = NSHomeDirectory()
+            write("sandboxed=\(home.contains("/Library/Containers/")) home=\(home)\ntrustedAfterPrompt=\(trusted)\n")
+            DispatchQueue.main.asyncAfter(deadline: .now() + 20) { NSApp.terminate(nil) }
+            return
+        }
         if what == "testmove" { testMove(); return }
         if what == "e2e" { e2e(); return }
         if what == "simulate" { simulateReconnect(); return }
@@ -183,8 +192,7 @@ enum DebugPreview {
             let rel = disp.map { CGPoint(x: w.frame.origin.x - $0.bounds.origin.x, y: w.frame.origin.y - $0.bounds.origin.y) }
             out += "WIN \(w.appName) | '\(w.title.prefix(30))' idx=\(w.index) frame=\(w.frame) -> disp=\(disp?.localizedName ?? "none") rel=\(rel.map{"(\(Int($0.x)),\(Int($0.y)))"} ?? "-")\n"
         }
-        let path = ProcessInfo.processInfo.environment["MG_DIAG_OUT"] ?? "/tmp/mg_diag.txt"
-        try? out.write(toFile: path, atomically: true, encoding: .utf8)
+        write(out)
         NSApp.terminate(nil)
     }
 
@@ -374,6 +382,10 @@ enum DebugPreview {
     }
 
     private static func write(_ s: String) {
+        // Also print: a sandboxed build cannot write outside its container, and stdout is the
+        // one channel that always reaches whoever launched it.
+        print(s, terminator: "")
+        fflush(stdout)
         let path = ProcessInfo.processInfo.environment["MG_DIAG_OUT"] ?? "/tmp/mg_diag.txt"
         try? s.write(toFile: path, atomically: true, encoding: .utf8)
     }
