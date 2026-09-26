@@ -1,0 +1,19 @@
+name: Build
+
+# Checks that every push and pull request compiles, in both configurations.
+# Releases are built, signed with Developer ID and notarized locally with fastlane,
+# so signing credentials never live in CI.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Release build
+        run: swift build -c release
+      - name: Debug build (includes the development harness)
+        run: swift build

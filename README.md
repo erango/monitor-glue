@@ -1,73 +1,110 @@
 # Monitor Glue
 
-Keep your apps **glued** to the right monitor.
+**Your windows go back where they belong when you plug your monitor back in.**
 
-macOS only remembers the *last* external display you connected. Switch between, say, a home
-monitor and an office monitor, and macOS dumps every window back onto your MacBook's built-in
-screen — so you re-drag and re-size windows every single day.
+[![Latest release](https://img.shields.io/github/v/release/erango/monitor-glue?label=download)](https://github.com/erango/monitor-glue/releases/latest)
+![macOS 14+](https://img.shields.io/badge/macOS-14%2B-blue)
+[![MIT License](https://img.shields.io/github/license/erango/monitor-glue)](LICENSE)
+[![Buy me a coffee](https://img.shields.io/badge/Ko--fi-buy%20me%20a%20coffee-29abe0?logo=kofi&logoColor=white)](https://ko-fi.com/erango)
 
-**Monitor Glue** is a lightweight menu-bar app that remembers, for each unique set of external
-monitors, which app windows lived on which display and at what size and position. When you
-reconnect a monitor it recognizes, it puts your windows back automatically.
+<p align="center">
+  <img src="docs/screenshots/menu.png" width="368" alt="Monitor Glue menu-bar menu">
+  <img src="docs/screenshots/manager.png" width="460" alt="Remembered monitors and windows">
+</p>
 
-## Features
+## The problem
 
-- 🧲 **Per-monitor memory** — every distinct monitor set is tracked separately (home vs office vs café).
-- 🔄 **Auto-restore** — reconnect a known monitor and windows snap back to where they belong.
-- 👀 **Built-in screen left alone** — only windows on *external* displays are remembered and moved.
-- 🛠 **Manager UI** — see remembered monitors, apps, and windows; delete any entry or all of them.
-- 🪶 **Tiny & native** — SwiftUI menu-bar app, no Dock icon.
+You work from home on one monitor and from the office on another. Every time you unplug,
+macOS piles every window onto the laptop screen. Plug back in, and nothing goes back — macOS
+only half-remembers the *last* display you used. So you drag and resize the same windows,
+every morning.
+
+Monitor Glue remembers where each window lived, **separately for each monitor you use**, and
+puts them back — right monitor, right position, right size — the moment you reconnect.
+
+## What it does
+
+- **Remembers per monitor.** Home and office layouts are kept apart and never overwrite each
+  other.
+- **Restores automatically** when a monitor connects, when you open the lid, when the Mac wakes,
+  and when you unlock. If you plug in at the lock screen, it waits and places everything the
+  moment you unlock.
+- **Respects your changes.** Resize a window on the monitor and that becomes its new place.
+  Drag a window to the laptop screen and it stays there — it won't be yanked back.
+- **Copes with stubborn apps.** Some apps refuse certain sizes (Slack has a minimum width);
+  Monitor Glue takes what the app allows instead of fighting it.
+- **Stays out of the way.** A menu-bar app with no Dock icon. A manager window shows every
+  remembered monitor, app and window, and lets you forget any of them.
 
 ## Install
 
-This app is **unsigned** (distributed via GitHub, not the App Store), so macOS Gatekeeper will
-block it on first launch. That's expected.
+1. Download `MonitorGlue.zip` from the [latest release](https://github.com/erango/monitor-glue/releases/latest).
+2. Unzip it and drag **MonitorGlue.app** to your Applications folder.
+3. Open it and grant **Accessibility** access when asked (System Settings → Privacy &
+   Security → Accessibility). This is the only permission it needs.
 
-1. Download `MonitorGlue.zip` from the [latest release](https://github.com/erango/monitor-glue/releases), unzip it, and move `MonitorGlue.app` to `/Applications`.
-2. Clear the quarantine flag (required because the app is unsigned):
-   ```bash
-   xattr -dr com.apple.quarantine /Applications/MonitorGlue.app
-   ```
-   *(Or: right-click the app → Open → Open.)*
-3. Launch it. Grant **Accessibility** access when prompted — Monitor Glue needs it to read and
-   move other apps' windows. (System Settings → Privacy & Security → Accessibility.)
+Requires macOS 14 Sonoma or later. The app is signed with a Developer ID and notarized by Apple.
+
+## Privacy
+
+No network access, no analytics, no accounts. Accessibility is used to read and set the
+position and size of other apps' windows — never their contents. Everything stays on your Mac:
+
+| What | Where |
+|---|---|
+| Remembered layouts | `~/Library/Application Support/MonitorGlue/layouts.json` |
+| Activity log (for troubleshooting) | `~/Library/Application Support/MonitorGlue/monitor-glue.log` |
 
 ## How it works
 
-- A monitor's identity is its stable display **UUID** (`CGDisplayCreateUUIDFromDisplayID`), so
-  it's recognized across reconnects even though macOS display IDs change.
-- The set of connected external monitors forms a key. While connected, Monitor Glue
-  continuously snapshots window positions on those displays into
-  `~/Library/Application Support/MonitorGlue/layouts.json`.
-- On reconnecting a known set, it matches saved windows (by app → title → index) and
-  repositions them via the Accessibility API.
+- **Monitors are identified by their hardware UUID**, not their macOS display ID (which changes
+  on every reconnect). The set of attached external displays forms the key a layout is saved
+  under — so a home monitor and an office monitor never share a layout.
+- **Positions are stored relative to the monitor's own origin.** macOS often brings a display
+  back at a different place in its arrangement; relative coordinates still land correctly.
+- **Windows are read and moved with the Accessibility API**, matched back to saved entries by
+  title, then by position in the app's window list.
+- **Restores retry for up to three minutes**, quickly at first. Right after a wake, apps can be
+  unresponsive to Accessibility for a while, and some apps are still relaunching.
+- **Why it isn't on the Mac App Store:** App Store apps must run in the App Sandbox, and the
+  sandbox hides other apps' windows from the Accessibility API. We tested it: the sandboxed
+  build was told it was trusted and then saw zero windows.
+
+## Troubleshooting
+
+- **Nothing is restored:** check Accessibility is on for Monitor Glue. If it looks on but the
+  app still asks for access, reset it and grant again:
+  `tccutil reset Accessibility com.erango.monitorglue`
+- **Something behaved oddly:** the log above records every monitor change and, for each
+  restore, which window matched which saved entry and the frame it got. It's the most useful
+  thing to attach to an issue.
 
 ## Build from source
 
-Requires Swift 5.9+ (Command Line Tools are enough — no full Xcode needed).
+Needs Swift 5.9+ (the Xcode Command Line Tools are enough).
 
 ```bash
-./Scripts/make_cert.sh     # once: create a stable self-signed identity (see below)
-./Scripts/bundle.sh        # builds and assembles dist/MonitorGlue.app
+./Scripts/make_cert.sh    # once: a stable local signing identity (see below)
+./Scripts/bundle.sh       # builds dist/MonitorGlue.app
 open dist/MonitorGlue.app
 ```
 
-**Why `make_cert.sh`:** an ad-hoc signature gets a fresh code hash on every rebuild, so macOS
-silently invalidates the Accessibility grant each time (the toggle looks ON in System Settings
-but the app still reports "access needed"). `make_cert.sh` creates a stable self-signed
-code-signing identity once; `bundle.sh` then signs with it, so the grant survives rebuilds.
-It's self-signed (not notarized) — this only stabilizes the permission, it does not change the
-Gatekeeper steps above. If a rebuild ever still shows the banner, reset once with
-`tccutil reset Accessibility com.erango.monitorglue` and re-grant.
+An ad-hoc-signed build gets a new code hash every time it's rebuilt, and macOS then quietly
+drops its Accessibility permission. `make_cert.sh` creates a self-signed identity so local
+rebuilds keep the permission.
 
-## Notes & limitations
+`CONFIG=debug ./Scripts/bundle.sh` builds into `dist/debug/` with a development harness
+compiled in (`MG_PREVIEW=menu`, `manager`, `diag`, and friends — see `DebugPreview.swift`).
+Release builds leave all of it out.
 
-- Local builds signed via `make_cert.sh` keep the Accessibility grant across rebuilds. Release
-  binaries built in CI are ad-hoc signed, so **installing a new release may require re-granting
-  Accessibility access** once (there's no notarized identity to key the grant to).
-- Window repositioning is best-effort. Some apps (Electron, full-screen, tabbed windows) may
-  resist exact placement; Monitor Glue logs and skips what it can't place rather than forcing it.
+## Contributing
 
-## License
+Issues and pull requests are welcome — especially reports of apps or monitor setups that don't
+restore correctly. Include the log and your macOS version.
 
-MIT
+## Support
+
+Monitor Glue is free and MIT-licensed. If it saves you a few minutes every morning,
+[buy me a coffee](https://ko-fi.com/erango) ☕
+
+Made by [@erango](https://github.com/erango).
