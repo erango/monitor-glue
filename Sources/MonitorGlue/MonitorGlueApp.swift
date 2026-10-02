@@ -38,6 +38,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         #endif
         AppModel.shared.start()
+        Updater.shared.start()
         if !Permissions.shared.isTrusted {
             OnboardingController.shared.show()
         }

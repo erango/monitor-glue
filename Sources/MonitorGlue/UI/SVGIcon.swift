@@ -44,7 +44,7 @@ enum SVGPathParser {
             let ux = -dy / dist, uy = dx / dist
             let sign: CGFloat = (large == sweep) ? -1 : 1
             let cx = mx + sign * h * ux, cy = my + sign * h * uy
-            var a0 = atan2(p0.y - cy, p0.x - cx)
+            let a0 = atan2(p0.y - cy, p0.x - cx)
             var a1 = atan2(p1.y - cy, p1.x - cx)
             if sweep { if a1 < a0 { a1 += 2 * .pi } } else { if a1 > a0 { a1 -= 2 * .pi } }
             let steps = max(6, Int(abs(a1 - a0) / (.pi / 24)))
@@ -200,6 +200,13 @@ enum MGIcon {
             .init(d: "M6.3 5.6a1.7 1.7 0 0 1 3.4 0", style: .strokeCurrent(1.3, true)),
             .init(d: "M8 7.4v5.5", style: .strokeCurrent(1.1, true)),
             .init(d: "M5.2 8.8H3.2M10.8 8.8h2M5.4 11.2l-1.7 1.2M10.6 11.2l1.7 1.2M5.6 6.6 4.2 5.3M10.4 6.6l1.4-1.3", style: .strokeCurrent(1.2, true)),
+        ])
+    }
+    /// Check for updates: a downward arrow into a tray, in the same stroke style.
+    static var update: SVGIcon {
+        SVGIcon(viewBox: 16, elements: [
+            .init(d: "M8 2.6v7.2M5.1 7.1 8 10l2.9-2.9", style: .strokeCurrent(1.4, true)),
+            .init(d: "M2.8 10.4v1.4a1.6 1.6 0 0 0 1.6 1.6h7.2a1.6 1.6 0 0 0 1.6-1.6v-1.4", style: .strokeCurrent(1.3, true)),
         ])
     }
 }

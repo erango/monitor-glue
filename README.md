@@ -54,12 +54,17 @@ unzip it, and drag **MonitorGlue.app** to your Applications folder.
 Then open it and grant **Accessibility** access when asked (System Settings → Privacy &
 Security → Accessibility). This is the only permission it needs.
 
-Requires macOS 14 Sonoma or later. The app is signed with a Developer ID and notarized by Apple.
+Requires macOS 14 Sonoma or later. The app is signed with a Developer ID and notarized by Apple,
+and keeps itself up to date: choose **Check for Updates…** in the menu, or let it check
+automatically.
 
 ## Privacy
 
-No network access, no analytics, no accounts. Accessibility is used to read and set the
-position and size of other apps' windows — never their contents. Everything stays on your Mac:
+No analytics, no accounts, and no data leaves your Mac. The only network request is the update
+check: Monitor Glue asks GitHub whether a newer version exists. It asks your permission before
+checking automatically, sends no information about your system, and you can switch it off in the
+menu at any time. Accessibility is used to read and set the position and size of other apps'
+windows — never their contents. Everything else stays on your Mac:
 
 | What | Where |
 |---|---|

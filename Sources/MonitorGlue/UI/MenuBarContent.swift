@@ -6,6 +6,7 @@ struct MenuBarContent: View {
     @StateObject private var loginItem = LoginItem.shared
     @Environment(\.openWindow) private var openWindow
     @Environment(\.dismiss) private var dismiss
+    @State private var autoUpdates = Updater.shared.automaticallyChecks
 
     var body: some View {
         // Native menus keep their items flush against each other and reserve the breathing
@@ -40,6 +41,8 @@ struct MenuBarContent: View {
 
             separator
 
+            MenuRow(title: "Check for Updates…", icon: MGIcon.update,
+                    action: choose { Updater.shared.checkForUpdates() })
             MenuRow(title: "Report a Bug…", icon: MGIcon.bug,
                     action: choose { BugReport.open() })
 
@@ -56,6 +59,7 @@ struct MenuBarContent: View {
         .onAppear {
             model.refreshStatus()
             loginItem.refresh()
+            autoUpdates = Updater.shared.automaticallyChecks
         }
     }
 
@@ -68,9 +72,17 @@ struct MenuBarContent: View {
     /// leading checkmark when on (rather than an embedded checkbox control, which cannot
     /// highlight on hover and reads as a form field inside a menu).
     private var launchAtLoginRow: some View {
-        MenuRow(title: "Launch at login", icon: nil,
-                checked: loginItem.isEnabled,
-                action: choose { loginItem.setEnabled(!loginItem.isEnabled) })
+        VStack(alignment: .leading, spacing: 0) {
+            MenuRow(title: "Launch at login", icon: nil,
+                    checked: loginItem.isEnabled,
+                    action: choose { loginItem.setEnabled(!loginItem.isEnabled) })
+            MenuRow(title: "Check for updates automatically", icon: nil,
+                    checked: autoUpdates,
+                    action: choose {
+                        Updater.shared.automaticallyChecks.toggle()
+                        autoUpdates = Updater.shared.automaticallyChecks
+                    })
+        }
     }
 
     private var canRestore: Bool {

@@ -39,6 +39,9 @@ echo "==> Assembling $APP …"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN" "$APP/Contents/MacOS/$APP_NAME"
+# Sparkle (in-app updates). ditto keeps the framework's internal symlinks intact.
+mkdir -p "$APP/Contents/Frameworks"
+ditto "$(dirname "$BIN")/Sparkle.framework" "$APP/Contents/Frameworks/Sparkle.framework"
 cp "$ROOT/Resources/Info.plist" "$APP/Contents/Info.plist"
 # App icon (optional): drop AppIcon.icns into Resources/ to include it.
 if [[ -f "$ROOT/Resources/AppIcon.icns" ]]; then
@@ -49,24 +52,38 @@ if [[ -n "${BUNDLE_ID:-}" ]]; then
     /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier $BUNDLE_ID" "$APP/Contents/Info.plist"
 fi
 
+# Sign inside-out, never with --deep: Sparkle's helpers (XPC services, Autoupdate, Updater.app)
+# must each be signed individually for notarization, and the app is signed last. Order and the
+# Downloader's preserved entitlements follow Sparkle's own documentation.
+sign_all() {
+    local identity="$1"; shift
+    local flags=("$@")
+    local fw="$APP/Contents/Frameworks/Sparkle.framework"
+    codesign --force ${flags[@]+"${flags[@]}"} --sign "$identity" "$fw/Versions/B/XPCServices/Installer.xpc"
+    codesign --force ${flags[@]+"${flags[@]}"} --preserve-metadata=entitlements --sign "$identity" "$fw/Versions/B/XPCServices/Downloader.xpc"
+    codesign --force ${flags[@]+"${flags[@]}"} --sign "$identity" "$fw/Versions/B/Autoupdate"
+    codesign --force ${flags[@]+"${flags[@]}"} --sign "$identity" "$fw/Versions/B/Updater.app"
+    codesign --force ${flags[@]+"${flags[@]}"} --sign "$identity" "$fw"
+    codesign --force ${flags[@]+"${flags[@]}"} --entitlements "$ENTITLEMENTS" --sign "$identity" "$APP"
+}
+
 if [[ -n "${SIGN_IDENTITY:-}" ]]; then
-    # A real Apple certificate: hardened runtime + secure timestamp, as notarization and the
-    # App Store both require.
+    # A real Apple certificate: hardened runtime + secure timestamp, as notarization requires.
     echo "==> Signing with '$SIGN_IDENTITY'…"
-    codesign --force --options runtime --timestamp \
-        --entitlements "$ENTITLEMENTS" --sign "$SIGN_IDENTITY" "$APP"
+    sign_all "$SIGN_IDENTITY" --options runtime --timestamp
 else
     # Local builds: prefer a stable self-signed identity so the Accessibility (TCC) grant
     # survives rebuilds. Falls back to ad-hoc (grant must be re-approved after each rebuild).
     IDENTITY="Monitor Glue Self-Signed"
     if security find-identity 2>/dev/null | grep -q "$IDENTITY"; then
         echo "==> Signing with stable identity '$IDENTITY'…"
-        codesign --force --entitlements "$ENTITLEMENTS" --sign "$IDENTITY" "$APP"
+        sign_all "$IDENTITY"
     else
         echo "==> No stable identity found — ad-hoc signing (run Scripts/make_cert.sh to make the"
         echo "    Accessibility permission persist across rebuilds)."
-        codesign --force --entitlements "$ENTITLEMENTS" --sign - "$APP"
+        sign_all -
     fi
 fi
+codesign --verify --deep --strict "$APP"
 
 echo "==> Done: $APP"

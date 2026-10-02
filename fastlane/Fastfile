@@ -1,6 +1,39 @@
 require 'digest'
 require 'tmpdir'
 
+# Sparkle's update feed, published as a release asset. The app reads
+# releases/latest/download/appcast.xml, so a one-item feed always describes the newest release.
+# sign_update signs the zip with the EdDSA key in the login keychain; the app refuses any update
+# whose signature doesn't match SUPublicEDKey.
+def write_appcast(root:, zip:, version:, build:, tag:, notes: nil)
+  sign_update = File.join(root, ".build/artifacts/sparkle/Sparkle/bin/sign_update")
+  UI.user_error!("Sparkle tools missing — run `swift package resolve` first") unless File.exist?(sign_update)
+  signature = sh("'#{sign_update}' '#{zip}'").strip     # sparkle:edSignature="…" length="…"
+  UI.user_error!("sign_update produced no signature") unless signature.include?("edSignature")
+  summary = notes || "Monitor Glue #{version} is available."
+  path = File.join(root, "dist/appcast.xml")
+  File.write(path, <<~XML)
+    <?xml version="1.0" encoding="utf-8"?>
+    <rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">
+      <channel>
+        <title>Monitor Glue</title>
+        <item>
+          <title>Monitor Glue #{version}</title>
+          <pubDate>#{Time.now.utc.strftime('%a, %d %b %Y %H:%M:%S +0000')}</pubDate>
+          <sparkle:version>#{build}</sparkle:version>
+          <sparkle:shortVersionString>#{version}</sparkle:shortVersionString>
+          <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+          <sparkle:fullReleaseNotesLink>https://github.com/erango/monitor-glue/releases/tag/#{tag}</sparkle:fullReleaseNotesLink>
+          <description><![CDATA[<p>#{summary}</p>]]></description>
+          <enclosure url="https://github.com/erango/monitor-glue/releases/download/#{tag}/MonitorGlue.zip"
+                     #{signature} type="application/octet-stream"/>
+        </item>
+      </channel>
+    </rss>
+  XML
+  path
+end
+
 default_platform(:mac)
 
 platform :mac do
@@ -32,7 +65,7 @@ platform :mac do
     get_certificates(platform: "macos", type: "developer_id_application")
   end
 
-  desc "Build, sign with Developer ID, notarize, and publish a GitHub release. fastlane release version:1.0.0"
+  desc "Build, sign with Developer ID, notarize, and publish a GitHub release. fastlane release version:1.1.0 notes:\"What changed\""
   lane :release do |options|
     version = options[:version] || UI.user_error!("Pass a version, e.g. fastlane release version:1.0.0")
     UI.user_error!("Version must look like 1.2.3") unless version.match?(/\A\d+\.\d+\.\d+\z/)
@@ -64,10 +97,12 @@ platform :mac do
     git_commit(path: plist, message: "Release #{version}")
     add_git_tag(tag: tag)
     push_to_git_remote(tags: true)
-    sh("gh release create #{tag} '#{zip}' --repo erango/monitor-glue --title 'Monitor Glue #{version}' --generate-notes")
+    appcast = write_appcast(root: root, zip: zip, version: version, build: build, tag: tag, notes: options[:notes])
+    sh("gh release create #{tag} '#{zip}' '#{appcast}' --repo erango/monitor-glue --title 'Monitor Glue #{version}' --generate-notes")
     update_homebrew_cask(version: version, zip: zip)
     UI.success("Released #{tag}: https://github.com/erango/monitor-glue/releases/tag/#{tag}")
   end
+
 
   # Point the Homebrew cask in erango/homebrew-tap at the new release. Works in a fresh
   # temporary clone so it never depends on, or disturbs, a local checkout.
