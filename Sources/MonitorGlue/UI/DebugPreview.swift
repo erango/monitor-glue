@@ -14,6 +14,7 @@ enum DebugPreview {
         guard let what = requested else { return }
         if what == "glyph" { dumpMenuBarGlyph(); return }
         if what == "diag" { diag(); return }
+        if what == "sandboxprobe" { sandboxProbe(); return }
         if what == "bugurl" {
             let url = BugReport.previewURL()
             write("length=\(url?.absoluteString.count ?? 0)\n\(url?.absoluteString ?? "nil")\n")
@@ -197,6 +198,67 @@ enum DebugPreview {
         }
         write(out)
         NSApp.terminate(nil)
+    }
+
+    /// Sandbox feasibility check, launched like a real app (not from a shell, which would lend it
+    /// the shell's Accessibility permission). Requests Accessibility for itself, then shows - and
+    /// keeps refreshing - whether it is sandboxed, whether it is trusted, and how many other apps'
+    /// windows it can actually see. A sandboxed app cannot write anywhere outside its container,
+    /// so the result is shown in a window to be read off the screen.
+    @MainActor private static func sandboxProbe() {
+        let key = kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String
+        _ = AXIsProcessTrustedWithOptions([key: true] as CFDictionary)   // adds it to the list
+
+        let label = NSTextField(labelWithString: "probing…")
+        label.font = .monospacedSystemFont(ofSize: 15, weight: .regular)
+        label.maximumNumberOfLines = 0
+        let win = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 620, height: 230),
+                           styleMask: [.titled, .closable], backing: .buffered, defer: false)
+        win.title = "Sandbox Probe"
+        let pad = NSView(frame: win.contentView!.bounds)
+        label.frame = pad.bounds.insetBy(dx: 18, dy: 14)
+        label.autoresizingMask = [.width, .height]
+        pad.addSubview(label)
+        win.contentView = pad
+        win.center()
+        win.isReleasedWhenClosed = false
+        win.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+        objc_setAssociatedObject(NSApplication.shared, "mg_preview_win", win, .OBJC_ASSOCIATION_RETAIN)
+
+        func refresh() {
+            let sandboxed = NSHomeDirectory().contains("/Library/Containers/")
+            let trusted = AXIsProcessTrusted()
+            let live = WindowManager.currentWindows()
+            let apps = Set(live.map { $0.appBundleID }).count
+            var moved = "-"
+            if let w = live.first {
+                let before = w.frame
+                let nudged = before.offsetBy(dx: 40, dy: 40)
+                let ok = WindowManager.setFrame(w.element, nudged)
+                _ = WindowManager.setFrame(w.element, before)
+                moved = ok ? "yes (\(w.appName))" : "no"
+            }
+            // The raw answer from the Accessibility API, asked of an app that certainly has a window.
+            var probeErr = "-"
+            if let finder = NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.finder").first {
+                var value: AnyObject?
+                let err = AXUIElementCopyAttributeValue(AXUIElementCreateApplication(finder.processIdentifier),
+                                                        kAXWindowsAttribute as CFString, &value)
+                probeErr = "\(err.rawValue) (\(err == .success ? "success" : err == .apiDisabled ? "apiDisabled" : err == .cannotComplete ? "cannotComplete" : err == .notImplemented ? "notImplemented" : "other"))"
+            }
+            label.stringValue = """
+            AX error asking Finder for windows: \(probeErr)
+            sandboxed:        \(sandboxed ? "YES" : "no")
+            trusted:          \(trusted ? "YES" : "no — grant Accessibility to this app")
+            windows visible:  \(live.count)  (from \(apps) apps)
+            can move one:     \(moved)
+
+            updated \(Date().formatted(date: .omitted, time: .standard))
+            """
+        }
+        refresh()
+        Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { _ in MainActor.assumeIsolated { refresh() } }
     }
 
     /// Repair aid: fill the external display with every window that belongs to it (below the
