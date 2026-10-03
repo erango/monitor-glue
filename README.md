@@ -6,6 +6,7 @@
 ![macOS 14+](https://img.shields.io/badge/macOS-14%2B-blue)
 [![MIT License](https://img.shields.io/github/license/erango/monitor-glue)](LICENSE)
 [![Buy me a coffee](https://img.shields.io/badge/Ko--fi-buy%20me%20a%20coffee-29abe0?logo=kofi&logoColor=white)](https://ko-fi.com/erango)
+[![AlternativeTo](https://img.shields.io/badge/AlternativeTo-listed-0d6efd)](https://alternativeto.net/software/monitor-glue/about/?utm_source=badge&utm_medium=referral)
 
 <p align="center">
   <img src="docs/demo.gif" width="720" alt="Unplug the monitor and macOS piles every window onto the laptop; plug it back in and Monitor Glue puts each window back in its place">
@@ -123,5 +124,9 @@ restore correctly. Include the log and your macOS version.
 
 Monitor Glue is free and MIT-licensed. If it saves you a few minutes every morning,
 [buy me a coffee](https://ko-fi.com/erango) ☕
+
+Another way to help, which costs nothing: a like on
+[AlternativeTo](https://alternativeto.net/software/monitor-glue/about/) helps other people with the
+same problem find it.
 
 Made by [@erango](https://github.com/erango).
