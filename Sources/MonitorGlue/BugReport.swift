@@ -62,7 +62,7 @@ enum BugReport {
         - Mac: \(hardwareModel())
         - Displays: \(displays.joined(separator: ", "))
         - Accessibility granted: \(Permissions.shared.isTrusted ? "yes" : "no")
-        - Remembered: \(sets.count) monitor set(s), \(sets.reduce(0) { $0 + $1.windows.count }) window(s)
+        - Remembered: \(sets.count) layout(s), \(sets.reduce(0) { $0 + $1.windows.count }) window(s)
         """
     }
 

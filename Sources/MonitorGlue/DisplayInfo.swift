@@ -51,17 +51,31 @@ enum DisplayInfo {
         liveDisplays().filter { !$0.isBuiltin }
     }
 
-    /// Stable key for the current set of external monitors: sorted UUIDs joined.
-    /// Empty string when only the built-in display is present.
-    static func monitorSetKey(for displays: [LiveDisplay]) -> String {
-        displays.filter { !$0.isBuiltin }
-            .map { $0.uuid }
-            .sorted()
-            .joined(separator: "|")
+    /// The displays a layout covers: the external monitors when any are connected (the case
+    /// macOS mishandles on reconnect), otherwise the built-in screen on its own, so unplugging
+    /// puts windows back the way they were on the laptop.
+    static func managedDisplays(_ displays: [LiveDisplay]) -> [LiveDisplay] {
+        let externals = displays.filter { !$0.isBuiltin }
+        return externals.isEmpty ? displays.filter { $0.isBuiltin } : externals
     }
 
+    private static let builtInPrefix = "builtin:"
+
+    /// Stable key for the current layout: the sorted UUIDs of the connected external monitors,
+    /// or "builtin:<uuid>" for the laptop screen alone (prefixed so it can never collide with a
+    /// monitor set). Empty only on a Mac with no display at all.
+    static func monitorSetKey(for displays: [LiveDisplay]) -> String {
+        let externals = displays.filter { !$0.isBuiltin }
+        if externals.isEmpty {
+            return displays.first(where: { $0.isBuiltin }).map { builtInPrefix + $0.uuid } ?? ""
+        }
+        return externals.map { $0.uuid }.sorted().joined(separator: "|")
+    }
+
+    static func isBuiltInOnly(_ key: String) -> Bool { key.hasPrefix(builtInPrefix) }
+
     static func records(for displays: [LiveDisplay]) -> [DisplayInfoRecord] {
-        displays.filter { !$0.isBuiltin }.map {
+        managedDisplays(displays).map {
             DisplayInfoRecord(uuid: $0.uuid, localizedName: $0.localizedName,
                               widthPx: $0.widthPx, heightPx: $0.heightPx)
         }

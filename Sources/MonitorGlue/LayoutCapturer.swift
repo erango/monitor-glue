@@ -37,14 +37,15 @@ final class LayoutCapturer {
 
     func stop() { timer?.invalidate(); timer = nil }
 
-    /// Take one snapshot now. Cheap no-op if nothing changed or no external display.
+    /// Take one snapshot now. Cheap no-op if nothing changed.
     /// `force` bypasses the post-connect pause (used by tests).
     func capture(force: Bool = false) {
         guard AXIsProcessTrusted() else { return }
         guard force || Date() >= suppressedUntil else { return }
         let displays = DisplayInfo.liveDisplays()
-        let externals = displays.filter { !$0.isBuiltin }
-        guard !externals.isEmpty else { return }
+        let managed = DisplayInfo.managedDisplays(displays)
+        guard !managed.isEmpty else { return }
+        let managedUUIDs = Set(managed.map { $0.uuid })
 
         let setKey = DisplayInfo.monitorSetKey(for: displays)
         guard !setKey.isEmpty else { return }
@@ -54,8 +55,8 @@ final class LayoutCapturer {
         var layouts: [WindowLayout] = []
         let now = Date()
 
-        // Saved windows the user has moved onto the built-in screen: forget them, rather than
-        // pulling them back to this monitor. Resolved with the same matcher restore uses, so
+        // Saved windows the user has moved off this layout's displays (onto the built-in screen,
+        // while monitors are connected): forget them, rather than pulling them back. Resolved with the same matcher restore uses, so
         // the two always agree about which open window a saved entry refers to. Keying this on
         // the window index instead made entries churn, because an app's window indices shift as
         // its windows come and go.
@@ -63,15 +64,15 @@ final class LayoutCapturer {
         if let saved = LayoutStore.shared.record(for: setKey)?.windows {
             let matched = LayoutMatcher.match(saved, to: live)
             for (i, win) in matched {
-                if WindowManager.display(for: win, in: displays)?.isBuiltin == true {
+                if let d = WindowManager.display(for: win, in: displays), !managedUUIDs.contains(d.uuid) {
                     movedToBuiltIn.insert(saved[i].id)
                 }
             }
         }
 
         for win in live {
-            // Only remember windows that live on an external display.
-            guard let disp = WindowManager.display(for: win, in: displays), !disp.isBuiltin else { continue }
+            // Only remember windows on the displays this layout covers.
+            guard let disp = WindowManager.display(for: win, in: displays), managedUUIDs.contains(disp.uuid) else { continue }
             // Store the position RELATIVE to the display's origin, so restore works even when
             // the display comes back at a different arrangement origin next session.
             layouts.append(WindowLayout(
@@ -106,6 +107,6 @@ final class LayoutCapturer {
             windows: layouts,
             evictSlots: movedToBuiltIn
         )
-        Log.write("captured \(layouts.count) window(s) for \(externals.map { $0.localizedName }.joined(separator: " + "))")
+        Log.write("captured \(layouts.count) window(s) for \(managed.map { $0.localizedName }.joined(separator: " + "))")
     }
 }

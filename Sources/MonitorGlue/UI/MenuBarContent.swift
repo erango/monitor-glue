@@ -128,14 +128,14 @@ struct MenuBarContent: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(model.connectedExternalDisplays > 0
                      ? "Tracking · \(model.connectedExternalDisplays) display\(model.connectedExternalDisplays == 1 ? "" : "s") connected"
-                     : "Idle · built-in display only")
+                     : "Tracking · built-in display")
                     .font(.system(size: 13, weight: .semibold))
-                if model.connectedExternalDisplays > 0, !model.currentSetLabel.isEmpty {
+                if !model.currentSetLabel.isEmpty {
                     Text("\(model.currentSetLabel) · \(model.currentSetWindowCount) window\(model.currentSetWindowCount == 1 ? "" : "s")")
                         .font(.system(size: 11.5))
                         .foregroundStyle(.secondary)
                 }
-                Text("\(model.rememberedCount) monitor set\(model.rememberedCount == 1 ? "" : "s") · \(model.totalWindowsRemembered) window\(model.totalWindowsRemembered == 1 ? "" : "s") remembered")
+                Text("\(model.rememberedCount) layout\(model.rememberedCount == 1 ? "" : "s") · \(model.totalWindowsRemembered) window\(model.totalWindowsRemembered == 1 ? "" : "s") remembered")
                     .font(.system(size: 11.5))
                     .foregroundStyle(.tertiary)
             }

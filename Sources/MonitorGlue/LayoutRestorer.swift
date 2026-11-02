@@ -83,7 +83,8 @@ enum LayoutRestorer {
             // the user put it there - dragging a window to the laptop must stick even while
             // this cycle is still waiting on some other app. During the settle phase we do move
             // built-in windows, since that is exactly the pile macOS makes on reconnect.
-            if !enforce, WindowManager.display(for: win, in: displays)?.isBuiltin == true {
+            // (Only for a monitor layout: restoring the laptop layout moves windows *onto* it.)
+            if !enforce, !disp.isBuiltin, WindowManager.display(for: win, in: displays)?.isBuiltin == true {
                 details.append("  SKIP \(layout.appName) idx=\(layout.windowIndex) '\(win.title.prefix(24))' — user moved it to the built-in screen")
                 continue
             }

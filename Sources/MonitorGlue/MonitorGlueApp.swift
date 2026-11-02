@@ -84,7 +84,7 @@ final class AppModel: ObservableObject {
 
         let known = !currentSetKey.isEmpty && LayoutStore.shared.record(for: currentSetKey) != nil
         let names = DisplayInfo.externalDisplays().map { $0.localizedName }.joined(separator: " + ")
-        Log.write("LAUNCHED → \(currentSetKey.isEmpty ? "built-in only" : names) known=\(known)")
+        Log.write("LAUNCHED → \(DisplayInfo.isBuiltInOnly(currentSetKey) ? "built-in display" : names) known=\(known)")
 
         // Restore BEFORE the capturer takes its first snapshot. Launching after a monitor was
         // connected (app quit, dock, reopen) looks exactly like a fresh connect: macOS has
@@ -153,7 +153,7 @@ final class AppModel: ObservableObject {
         LayoutCapturer.shared.currentSetKey = key
         let known = !key.isEmpty && LayoutStore.shared.record(for: key) != nil
         let names = DisplayInfo.externalDisplays().map { $0.localizedName }.joined(separator: " + ")
-        Log.write("DISPLAY SET CHANGED → \(key.isEmpty ? "built-in only" : names) key=\(key.prefix(8)) known=\(known)")
+        Log.write("DISPLAY SET CHANGED → \(DisplayInfo.isBuiltInOnly(key) ? "built-in display" : names) key=\(key.prefix(8)) known=\(known)")
         if known { restoreWithRetries(key) }
         refreshStatus()
     }
@@ -246,14 +246,15 @@ final class AppModel: ObservableObject {
             currentSetLabel = record.label
             currentSetWindowCount = record.windows.count
         } else {
-            currentSetLabel = externals.map { $0.localizedName }.sorted().joined(separator: " + ")
+            currentSetLabel = DisplayInfo.managedDisplays(DisplayInfo.liveDisplays())
+                .map { $0.localizedName }.sorted().joined(separator: " + ")
             currentSetWindowCount = 0
         }
 
         if !Permissions.shared.isTrusted {
             statusText = "Accessibility access needed"
         } else if connectedExternalDisplays == 0 {
-            statusText = "Built-in display only — idle"
+            statusText = "Tracking · built-in display"
         } else {
             statusText = "Tracking · \(connectedExternalDisplays) display\(connectedExternalDisplays == 1 ? "" : "s") connected"
         }

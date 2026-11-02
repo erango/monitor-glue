@@ -70,7 +70,7 @@ struct ManagementView: View {
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("This forgets every monitor set and window position. This can't be undone.")
+            Text("This forgets every saved layout and window position. This can't be undone.")
         }
     }
 
@@ -172,7 +172,7 @@ private struct SetCard: View {
                 Spacer()
                 Text("\(apps.count) app\(apps.count == 1 ? "" : "s") · \(set.windows.count) window\(set.windows.count == 1 ? "" : "s")")
                     .font(.system(size: 11.5)).foregroundStyle(.secondary)
-                DeleteButton(icon: MGIcon.trash, help: "Forget this entire monitor set") {
+                DeleteButton(icon: MGIcon.trash, help: "Forget this entire layout") {
                     LayoutStore.shared.deleteSet(key: set.key); onChange()
                 }
             }
@@ -204,7 +204,7 @@ private struct SetCard: View {
                     Text(app.name).font(.system(size: 13, weight: .medium))
                     Spacer()
                     Text("\(app.windows.count)").font(.system(size: 11.5)).foregroundStyle(.secondary)
-                    DeleteButton(icon: MGIcon.trash, help: "Forget this app on this monitor set") {
+                    DeleteButton(icon: MGIcon.trash, help: "Forget this app in this layout") {
                         LayoutStore.shared.deleteApp(setKey: set.key, bundleID: app.bundleID); onChange()
                     }
                 }
