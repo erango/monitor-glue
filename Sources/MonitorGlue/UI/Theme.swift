@@ -69,12 +69,98 @@ struct MonitorGlyph: View {
     }
 }
 
+/// The glyphs a user can pick for the menu-bar item. The bottle is the brand mark; the
+/// monitor was the original one, kept for anyone who has grown used to it. A monitor alone
+/// got lost among the display utilities many people also keep in their menu bar.
+enum MenuBarIconStyle: String, CaseIterable, Identifiable {
+    case bottle, pinnedWindow, monitor
+
+    static let defaultsKey = "menuBarIcon"
+    static let `default` = MenuBarIconStyle.bottle
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .bottle: return "Glue bottle"
+        case .pinnedWindow: return "Pinned window"
+        case .monitor: return "Monitor"
+        }
+    }
+}
+
+/// Glue bottle beside a drop: the Monitor Glue brand mark (viewBox 0 0 24 24).
+struct BottleGlyph: View {
+    var lineWidth: CGFloat = 1.8
+
+    var body: some View {
+        GeometryReader { geo in
+            let s = min(geo.size.width, geo.size.height) / 24
+            ZStack {
+                Path { p in
+                    p.addPath(SVGPathParser.path("M5.8 10.6 7.2 7.6h4.4l1.4 3", scale: s))     // shoulder
+                    p.addRoundedRect(in: CGRect(x: 3.9 * s, y: 10.6 * s, width: 11 * s, height: 10.6 * s),
+                                     cornerSize: CGSize(width: 2.4 * s, height: 2.4 * s))   // body
+                    p.addPath(SVGPathParser.path("M8.1 7.6 8.8 3.1H10l.7 4.5", scale: s))      // nozzle
+                    p.addPath(SVGPathParser.path("M7 15.6h4.8", scale: s))                     // label
+                }
+                .stroke(style: StrokeStyle(lineWidth: lineWidth * s, lineCap: .round, lineJoin: .round))
+
+                SVGPathParser.path("M20.4 10.4c0 1.2-.9 2.1-2 2.1s-2-.9-2-2.1c0-1.5 2-3.6 2-3.6s2 2.1 2 3.6Z", scale: s)
+                    .fill()                                                                    // drop
+            }
+        }
+    }
+}
+
+/// A window held in place by a push pin (viewBox 0 0 24 24).
+struct PinnedWindowGlyph: View {
+    var lineWidth: CGFloat = 1.8
+
+    var body: some View {
+        GeometryReader { geo in
+            let s = min(geo.size.width, geo.size.height) / 24
+            Path { p in
+                p.addRoundedRect(in: CGRect(x: 2.8 * s, y: 7.5 * s, width: 15.4 * s, height: 12.5 * s),
+                                 cornerSize: CGSize(width: 2 * s, height: 2 * s))
+                p.addPath(SVGPathParser.path("M2.8 10.8h15.4", scale: s))
+                // The pin, tilted 40° about its point of contact.
+                var pin = Path()
+                pin.addRoundedRect(in: CGRect(x: 15.8 * s, y: 1.2 * s, width: 4.4 * s, height: 2 * s),
+                                   cornerSize: CGSize(width: 0.8 * s, height: 0.8 * s))
+                pin.addPath(SVGPathParser.path("M16.6 3.2 16 6.6h4l-.6-3.4", scale: s))
+                pin.addPath(SVGPathParser.path("M18 6.6v4", scale: s))
+                let pivot = CGPoint(x: 18 * s, y: 6 * s)
+                let tilt = CGAffineTransform(translationX: pivot.x, y: pivot.y)
+                    .rotated(by: 40 * .pi / 180)
+                    .translatedBy(x: -pivot.x, y: -pivot.y)
+                p.addPath(pin, transform: tilt)
+            }
+            .stroke(style: StrokeStyle(lineWidth: lineWidth * s, lineCap: .round, lineJoin: .round))
+        }
+    }
+}
+
+/// Whichever glyph the user picked for the menu bar, in the current foreground color.
+struct MenuBarGlyph: View {
+    let style: MenuBarIconStyle
+    var lineWidth: CGFloat = 1.8
+
+    var body: some View {
+        switch style {
+        case .bottle: BottleGlyph(lineWidth: lineWidth)
+        case .pinnedWindow: PinnedWindowGlyph(lineWidth: lineWidth)
+        case .monitor: MonitorGlyph(lineWidth: lineWidth)
+        }
+    }
+}
+
 /// App + menu-bar glyph rendering.
 enum AppGlyph {
-    /// Monochrome template image for the menu-bar item (the brand monitor+pin mark).
-    @MainActor static func menuBarTemplate() -> NSImage {
+    /// Monochrome template image for the menu-bar item.
+    @MainActor static func menuBarTemplate(_ style: MenuBarIconStyle = .default) -> NSImage {
         let renderer = ImageRenderer(
-            content: MonitorGlyph(lineWidth: 1.9)
+            content: MenuBarGlyph(style: style, lineWidth: 1.9)
                 .foregroundStyle(.black)
                 .frame(width: 18, height: 18)
                 .padding(.horizontal, 1)
@@ -86,7 +172,7 @@ enum AppGlyph {
     }
 }
 
-/// Brand app-icon squircle (onboarding + header) — the white brand mark on the brand gradient.
+/// Brand app-icon squircle (onboarding) — the white brand mark on the brand gradient.
 struct BrandSquircle: View {
     var size: CGFloat = 74
     var body: some View {
@@ -94,9 +180,9 @@ struct BrandSquircle: View {
             RoundedRectangle(cornerRadius: size * 0.23, style: .continuous)
                 .fill(LinearGradient(colors: [Theme.brandTop, Theme.brandBottom],
                                      startPoint: .topLeading, endPoint: .bottomTrailing))
-            MonitorGlyph(lineWidth: 1.7)
+            BottleGlyph(lineWidth: 1.7)
                 .foregroundStyle(.white)
-                .frame(width: size * 0.52, height: size * 0.52)
+                .frame(width: size * 0.56, height: size * 0.56)
         }
         .frame(width: size, height: size)
         .shadow(color: Theme.brandBottom.opacity(0.45), radius: size * 0.12, y: size * 0.05)

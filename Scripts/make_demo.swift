@@ -157,19 +157,51 @@ func drawWindow(_ w: Win, _ r: CGRect) {
 }
 
 // The app's brand mark: monitor on a stand with a location pin, in a 24-unit box.
+/// The brand mark: a glue bottle beside a drop, in the design's 24-unit, y-down space.
+/// `p` maps a design point into the drawing; `k` is the design-unit size.
+func drawBottle(_ p: (CGFloat, CGFloat) -> NSPoint, k: CGFloat, lineWidth: CGFloat, color: NSColor) {
+    color.setStroke(); color.setFill()
+    func stroke(_ path: NSBezierPath) {
+        path.lineWidth = lineWidth * k; path.lineCapStyle = .round; path.lineJoinStyle = .round
+        path.stroke()
+    }
+    // Shoulder.
+    let shoulder = NSBezierPath()
+    shoulder.move(to: p(5.8, 10.6)); shoulder.line(to: p(7.2, 7.6)); shoulder.line(to: p(11.6, 7.6)); shoulder.line(to: p(13, 10.6))
+    stroke(shoulder)
+    // Body: a rounded rect, drawn through the mapping so it works flipped or not.
+    let body = NSBezierPath()
+    let (x0, y0, x1, y1, r): (CGFloat, CGFloat, CGFloat, CGFloat, CGFloat) = (3.9, 10.6, 14.9, 21.2, 2.4)
+    let c: CGFloat = 0.5523 * r
+    body.move(to: p(x0 + r, y0)); body.line(to: p(x1 - r, y0))
+    body.curve(to: p(x1, y0 + r), controlPoint1: p(x1 - r + c, y0), controlPoint2: p(x1, y0 + r - c))
+    body.line(to: p(x1, y1 - r))
+    body.curve(to: p(x1 - r, y1), controlPoint1: p(x1, y1 - r + c), controlPoint2: p(x1 - r + c, y1))
+    body.line(to: p(x0 + r, y1))
+    body.curve(to: p(x0, y1 - r), controlPoint1: p(x0 + r - c, y1), controlPoint2: p(x0, y1 - r + c))
+    body.line(to: p(x0, y0 + r))
+    body.curve(to: p(x0 + r, y0), controlPoint1: p(x0, y0 + r - c), controlPoint2: p(x0 + r - c, y0))
+    body.close()
+    stroke(body)
+    // Nozzle and label.
+    let detail = NSBezierPath()
+    detail.move(to: p(8.1, 7.6)); detail.line(to: p(8.8, 3.1)); detail.line(to: p(10, 3.1)); detail.line(to: p(10.7, 7.6))
+    detail.move(to: p(7, 15.6)); detail.line(to: p(11.8, 15.6))
+    stroke(detail)
+    // Drop.
+    let drop = NSBezierPath()
+    drop.move(to: p(20.4, 10.4))
+    drop.curve(to: p(18.4, 12.5), controlPoint1: p(20.4, 11.6), controlPoint2: p(19.5, 12.5))
+    drop.curve(to: p(16.4, 10.4), controlPoint1: p(17.3, 12.5), controlPoint2: p(16.4, 11.6))
+    drop.curve(to: p(18.4, 6.8), controlPoint1: p(16.4, 8.9), controlPoint2: p(18.4, 6.8))
+    drop.curve(to: p(20.4, 10.4), controlPoint1: p(18.4, 6.8), controlPoint2: p(20.4, 8.9))
+    drop.close()
+    drop.fill()
+}
+
 func drawGlyph(center c: CGPoint, size s: CGFloat, color: NSColor) {
     let k = s / 24, o = CGPoint(x: c.x - s / 2, y: c.y - s / 2)
-    func p(_ x: CGFloat, _ y: CGFloat) -> CGPoint { CGPoint(x: o.x + x * k, y: o.y + y * k) }
-    color.setStroke(); color.setFill()
-    let screen = NSBezierPath(roundedRect: CGRect(x: o.x + 2.6 * k, y: o.y + 3.4 * k, width: 18.8 * k, height: 13 * k),
-                              xRadius: 2.3 * k, yRadius: 2.3 * k)
-    screen.lineWidth = 1.8 * k; screen.stroke()
-    let stand = NSBezierPath(); stand.lineWidth = 1.8 * k; stand.lineCapStyle = .round
-    stand.move(to: p(9, 20.4)); stand.line(to: p(15, 20.4))
-    stand.move(to: p(12, 16.4)); stand.line(to: p(12, 20.4))
-    stand.move(to: p(12, 10.9)); stand.line(to: p(12, 14))
-    stand.stroke()
-    NSBezierPath(ovalIn: CGRect(x: o.x + (12 - 2.3) * k, y: o.y + (8.6 - 2.3) * k, width: 4.6 * k, height: 4.6 * k)).fill()
+    drawBottle({ x, y in NSPoint(x: o.x + x * k, y: o.y + y * k) }, k: k, lineWidth: 1.8, color: color)
 }
 
 func drawText(_ s: String, at y: CGFloat, alpha: CGFloat) {

@@ -127,10 +127,15 @@ enum DebugPreview {
         if what == "menu" { Permissions.shared._setPreviewTrusted(true) }
         AppModel.shared.currentSetKey = "UUID-DELL"
         AppModel.shared.refreshStatus()
-        // Sample status counts (no live displays in the harness).
-        AppModel.shared.connectedExternalDisplays = 1
-        AppModel.shared.currentSetLabel = "Dell U2720Q"
-        AppModel.shared.currentSetWindowCount = 5
+        // Sample status counts (no live displays in the harness). Applied again once the menu
+        // is up, since its onAppear refreshes the status from the real displays.
+        func sampleStatus() {
+            AppModel.shared.connectedExternalDisplays = 1
+            AppModel.shared.currentSetLabel = "Dell U2720Q"
+            AppModel.shared.currentSetWindowCount = 5
+        }
+        sampleStatus()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { sampleStatus() }
         if what == "manager" { showManager() }
         if what == "menu" { showMenu() }
     }
@@ -456,17 +461,28 @@ enum DebugPreview {
     }
 
     @MainActor private static func dumpMenuBarGlyph() {
-        let tmpl = AppGlyph.menuBarTemplate()
-        let tileH = 44.0, tileW = 60.0
-        let tile = NSImage(size: NSSize(width: tileW, height: tileH))
+        // Every menu-bar style side by side, on a light and a dark strip.
+        let styles = MenuBarIconStyle.allCases
+        let tileH = 44.0, tileW = 60.0, g = 18.0
+        let tile = NSImage(size: NSSize(width: tileW * Double(styles.count), height: tileH * 2))
         tile.lockFocus()
-        NSColor.white.setFill()
-        NSRect(x: 0, y: 0, width: tileW, height: tileH).fill()
-        // Template draws in black via the current fill color.
-        NSColor.black.set()
-        let g = 18.0
-        tmpl.draw(in: NSRect(x: (tileW-g)/2, y: (tileH-g)/2, width: g, height: g),
-                  from: .zero, operation: .sourceOver, fraction: 1.0)
+        for (row, (bg, ink)) in [(NSColor.white, NSColor.black), (NSColor(white: 0.16, alpha: 1), NSColor.white)].enumerated() {
+            bg.setFill()
+            NSRect(x: 0, y: Double(row) * tileH, width: tileW * Double(styles.count), height: tileH).fill()
+            for (i, style) in styles.enumerated() {
+                let tmpl = AppGlyph.menuBarTemplate(style)
+                let r = NSRect(x: Double(i) * tileW + (tileW - g) / 2, y: Double(row) * tileH + (tileH - g) / 2, width: g, height: g)
+                // A template image is a mask: tint a copy, the way the menu bar does.
+                let tinted = NSImage(size: NSSize(width: g, height: g))
+                tinted.lockFocus()
+                let local = NSRect(x: 0, y: 0, width: g, height: g)
+                tmpl.draw(in: local, from: .zero, operation: .sourceOver, fraction: 1.0)
+                ink.set()
+                local.fill(using: .sourceAtop)
+                tinted.unlockFocus()
+                tinted.draw(in: r, from: .zero, operation: .sourceOver, fraction: 1.0)
+            }
+        }
         tile.unlockFocus()
         if let tiff = tile.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff),
            let png = rep.representation(using: .png, properties: [:]) {
@@ -490,6 +506,7 @@ enum DebugPreview {
         win.backgroundColor = .clear
         win.hasShadow = false
         win.title = "Monitor Glue Menu"
+        if ProcessInfo.processInfo.environment["MG_APPEARANCE"] == "light" { win.appearance = NSAppearance(named: .aqua) }
         placeOnBuiltIn(win)
     }
 

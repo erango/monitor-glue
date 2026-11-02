@@ -7,6 +7,7 @@ struct MenuBarContent: View {
     @Environment(\.openWindow) private var openWindow
     @Environment(\.dismiss) private var dismiss
     @State private var autoUpdates = Updater.shared.automaticallyChecks
+    @AppStorage(MenuBarIconStyle.defaultsKey) private var iconStyle = MenuBarIconStyle.default
 
     var body: some View {
         // Native menus keep their items flush against each other and reserve the breathing
@@ -82,7 +83,24 @@ struct MenuBarContent: View {
                         Updater.shared.automaticallyChecks.toggle()
                         autoUpdates = Updater.shared.automaticallyChecks
                     })
+            iconPicker
         }
+    }
+
+    /// Choose the menu-bar glyph in place. It stays open on purpose: the point is to watch the
+    /// icon change up in the menu bar and compare.
+    private var iconPicker: some View {
+        HStack(spacing: 9) {
+            Color.clear.frame(width: 17, height: 1)
+            Text("Menu bar icon").font(.system(size: 13))
+            Spacer(minLength: 8)
+            HStack(spacing: 2) {
+                ForEach(MenuBarIconStyle.allCases) { style in
+                    IconChoice(style: style, selected: iconStyle == style) { iconStyle = style }
+                }
+            }
+        }
+        .padding(.vertical, 2).padding(.horizontal, 8)
     }
 
     private var canRestore: Bool {
@@ -111,7 +129,7 @@ struct MenuBarContent: View {
 
     private var header: some View {
         HStack(spacing: 8) {
-            MonitorGlyph()
+            MenuBarGlyph(style: iconStyle)
                 .foregroundStyle(Theme.accent)
                 .frame(width: 17, height: 17)
             Text("Monitor Glue").font(.system(size: 14.5, weight: .semibold))
@@ -229,6 +247,34 @@ private struct HoverLink<Label: View>: View {
         .buttonStyle(.plain)
         .contentShape(Rectangle())
         .onHover { hovering = $0 }
+    }
+}
+
+/// One option in the menu-bar icon picker: the glyph on a small selectable tile.
+private struct IconChoice: View {
+    let style: MenuBarIconStyle
+    let selected: Bool
+    let action: () -> Void
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: action) {
+            MenuBarGlyph(style: style)
+                .frame(width: 16, height: 16)
+                .foregroundStyle(selected ? AnyShapeStyle(.white) : AnyShapeStyle(.primary))
+                .frame(width: 26, height: 22)
+                .background(
+                    RoundedRectangle(cornerRadius: 5, style: .continuous)
+                        .fill(selected ? Theme.accent
+                              : (hovering ? Theme.controlFill : Color.clear))
+                )
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+        .help(style.title)
+        .accessibilityLabel("\(style.title) menu bar icon")
+        .accessibilityAddTraits(selected ? .isSelected : [])
     }
 }
 

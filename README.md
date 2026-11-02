@@ -26,6 +26,8 @@ puts them back — right monitor, right position, right size — the moment you 
 
 - **Remembers per monitor.** Home and office layouts are kept apart and never overwrite each
   other.
+- **Remembers the laptop screen too.** Unplug and your windows go back to where you had them on
+  the built-in display, not wherever macOS dropped them.
 - **Restores automatically** when a monitor connects, when you open the lid, when the Mac wakes,
   and when you unlock. If you plug in at the lock screen, it waits and places everything the
   moment you unlock.
@@ -34,7 +36,8 @@ puts them back — right monitor, right position, right size — the moment you 
 - **Copes with stubborn apps.** Some apps refuse certain sizes (Slack has a minimum width);
   Monitor Glue takes what the app allows instead of fighting it.
 - **Stays out of the way.** A menu-bar app with no Dock icon. A manager window shows every
-  remembered monitor, app and window, and lets you forget any of them.
+  remembered monitor, app and window, and lets you forget any of them. Pick the menu-bar icon
+  that stands out in your menu bar: a glue bottle, a pinned window, or a monitor.
 
 <p align="center">
   <img src="docs/screenshots/menu.png" width="368" alt="Monitor Glue menu-bar menu">
@@ -76,7 +79,8 @@ windows — never their contents. Everything else stays on your Mac:
 
 - **Monitors are identified by their hardware UUID**, not their macOS display ID (which changes
   on every reconnect). The set of attached external displays forms the key a layout is saved
-  under — so a home monitor and an office monitor never share a layout.
+  under — so a home monitor and an office monitor never share a layout. With no monitor
+  attached, the built-in display gets a layout of its own.
 - **Positions are stored relative to the monitor's own origin.** macOS often brings a display
   back at a different place in its arrangement; relative coordinates still land correctly.
 - **Windows are read and moved with the Accessibility API**, matched back to saved entries by
