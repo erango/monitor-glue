@@ -5,12 +5,35 @@ require 'tmpdir'
 # releases/latest/download/appcast.xml, so a one-item feed always describes the newest release.
 # sign_update signs the zip with the EdDSA key in the login keychain; the app refuses any update
 # whose signature doesn't match SUPublicEDKey.
+# Release notes are Markdown: "- " lines become a list, anything else a paragraph. Sparkle shows
+# this HTML in its update dialog; GitHub renders the same Markdown on the release page.
+def release_notes_html(notes)
+  return nil if notes.nil? || notes.strip.empty?
+  esc = ->(t) { t.gsub("&", "&amp;").gsub("<", "&lt;").gsub(">", "&gt;").gsub(/\*\*(.+?)\*\*/, '<b>\\1</b>') }
+  html = +""
+  in_list = false
+  notes.each_line do |line|
+    line = line.strip
+    if line.start_with?("- ")
+      html << "<ul>" unless in_list
+      in_list = true
+      html << "<li>#{esc.(line[2..])}</li>"
+    else
+      html << "</ul>" if in_list
+      in_list = false
+      html << "<p>#{esc.(line)}</p>" unless line.empty?
+    end
+  end
+  html << "</ul>" if in_list
+  html
+end
+
 def write_appcast(root:, zip:, version:, build:, tag:, notes: nil)
   sign_update = File.join(root, ".build/artifacts/sparkle/Sparkle/bin/sign_update")
   UI.user_error!("Sparkle tools missing — run `swift package resolve` first") unless File.exist?(sign_update)
   signature = sh("'#{sign_update}' '#{zip}'").strip     # sparkle:edSignature="…" length="…"
   UI.user_error!("sign_update produced no signature") unless signature.include?("edSignature")
-  summary = notes || "Monitor Glue #{version} is available."
+  summary = release_notes_html(notes) || "<p>Monitor Glue #{version} is available.</p>"
   path = File.join(root, "dist/appcast.xml")
   File.write(path, <<~XML)
     <?xml version="1.0" encoding="utf-8"?>
@@ -24,7 +47,7 @@ def write_appcast(root:, zip:, version:, build:, tag:, notes: nil)
           <sparkle:shortVersionString>#{version}</sparkle:shortVersionString>
           <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
           <sparkle:fullReleaseNotesLink>https://github.com/erango/monitor-glue/releases/tag/#{tag}</sparkle:fullReleaseNotesLink>
-          <description><![CDATA[<p>#{summary}</p>]]></description>
+          <description><![CDATA[#{summary}]]></description>
           <enclosure url="https://github.com/erango/monitor-glue/releases/download/#{tag}/MonitorGlue.zip"
                      #{signature} type="application/octet-stream"/>
         </item>
@@ -98,7 +121,13 @@ platform :mac do
     add_git_tag(tag: tag)
     push_to_git_remote(tags: true)
     appcast = write_appcast(root: root, zip: zip, version: version, build: build, tag: tag, notes: options[:notes])
-    sh("gh release create #{tag} '#{zip}' '#{appcast}' --repo erango/monitor-glue --title 'Monitor Glue #{version}' --generate-notes")
+    notes_flag = ""
+    if options[:notes] && !options[:notes].strip.empty?
+      notes_file = File.join(root, "dist/release-notes.md")
+      File.write(notes_file, options[:notes])
+      notes_flag = "--notes-file '#{notes_file}'"
+    end
+    sh("gh release create #{tag} '#{zip}' '#{appcast}' --repo erango/monitor-glue --title 'Monitor Glue #{version}' #{notes_flag} --generate-notes")
     update_homebrew_cask(version: version, zip: zip)
     UI.success("Released #{tag}: https://github.com/erango/monitor-glue/releases/tag/#{tag}")
   end

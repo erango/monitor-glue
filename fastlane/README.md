@@ -37,7 +37,7 @@ Create (or download) the Developer ID Application certificate into the login key
 [bundle exec] fastlane mac release
 ```
 
-Build, sign with Developer ID, notarize, and publish a GitHub release. fastlane release version:1.0.0
+Build, sign with Developer ID, notarize, and publish a GitHub release. fastlane release version:1.1.0 notes:"What changed"
 
 ----
 
