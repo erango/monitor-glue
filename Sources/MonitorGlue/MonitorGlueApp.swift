@@ -67,6 +67,8 @@ final class AppModel: ObservableObject {
     /// Set while a restore for this monitor set has not yet placed every saved window.
     private var restorePendingKey: String?
     private var recheckDebounce: DispatchWorkItem?
+    /// Launched apps whose windows are being placed, by bundle ID.
+    private var launchPlacements: [String: LayoutRestorer.LaunchProgress] = [:]
 
     func start() {
         Permissions.shared.refresh()
@@ -80,6 +82,7 @@ final class AppModel: ObservableObject {
         }
         watcher.start()
         observeWakeEvents()
+        observeAppLaunches()
         currentSetKey = watcher.currentKey
         LayoutCapturer.shared.currentSetKey = currentSetKey
 
@@ -127,6 +130,57 @@ final class AppModel: ObservableObject {
             forName: NSNotification.Name("com.apple.screenIsUnlocked"), object: nil, queue: .main
         ) { [weak self] _ in
             self?.recheckLayout(reason: "screen unlocked")
+        }
+    }
+
+    /// An app reopens its windows wherever macOS chooses, which is usually the display the
+    /// pointer is on rather than where the app was when it quit. Put them back.
+    private func observeAppLaunches() {
+        NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didLaunchApplicationNotification, object: nil, queue: .main
+        ) { [weak self] note in
+            guard let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
+                  app.activationPolicy == .regular,
+                  let bundleID = app.bundleIdentifier else { return }
+            self?.placeLaunchedApp(bundleID, name: app.localizedName ?? bundleID)
+        }
+    }
+
+    private func placeLaunchedApp(_ bundleID: String, name: String) {
+        let key = currentSetKey
+        guard Permissions.shared.isTrusted, !key.isEmpty,
+              let saved = LayoutStore.shared.record(for: key)?.windows.filter({ $0.appBundleID == bundleID }),
+              !saved.isEmpty else { return }
+        Log.write("APP LAUNCHED → \(name): placing \(saved.count) saved window(s)")
+        // Keep the app's windows out of snapshots until they are placed, or the spot macOS
+        // opened them at would overwrite the saved one.
+        let giveUpAfter = 20.0
+        LayoutCapturer.shared.hold(app: bundleID, for: giveUpAfter + 2)
+        launchPlacements[bundleID] = LayoutRestorer.LaunchProgress()
+        attemptLaunchPlacement(bundleID, name: name, key: key, elapsed: 0, giveUpAfter: giveUpAfter)
+    }
+
+    /// Windows of a launching app appear over the first second or so, and some apps open more
+    /// later (documents, projects); poll briefly until each saved window has been placed.
+    private func attemptLaunchPlacement(_ bundleID: String, name: String, key: String,
+                                        elapsed: Double, giveUpAfter: Double) {
+        let interval = 0.3
+        DispatchQueue.main.asyncAfter(deadline: .now() + interval) { [weak self] in
+            guard let self, var progress = self.launchPlacements[bundleID] else { return }
+            let next = elapsed + interval
+            func finish(_ outcome: String) {
+                self.launchPlacements[bundleID] = nil
+                LayoutCapturer.shared.release(app: bundleID)
+                Log.write("APP LAUNCHED → \(name): \(outcome)")
+            }
+            guard self.currentSetKey == key else { return finish("displays changed; left to the full restore") }
+            LayoutRestorer.restoreApp(bundleID, setKey: key, progress: &progress)
+            self.launchPlacements[bundleID] = progress
+            if progress.isDone { return finish("\(progress.placedAt.count) window(s) placed") }
+            if next >= giveUpAfter {
+                return finish("\(progress.placedAt.count) placed, \(progress.waiting) saved window(s) never opened")
+            }
+            self.attemptLaunchPlacement(bundleID, name: name, key: key, elapsed: next, giveUpAfter: giveUpAfter)
         }
     }
 

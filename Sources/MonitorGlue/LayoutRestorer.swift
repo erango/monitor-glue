@@ -149,6 +149,65 @@ enum LayoutRestorer {
         return Outcome(placed: moved, missing: missing, pendingPlacements: pendingPlacements)
     }
 
+    /// How long after placing a launched app's window we keep checking it. Some apps restore
+    /// their own idea of the frame a moment after the window appears, undoing ours; anything
+    /// later than this is the user moving it, which must stick.
+    static let launchSettle: TimeInterval = 1.5
+
+    /// Progress of placing one launched app's windows.
+    struct LaunchProgress {
+        /// Saved window id → when it was placed.
+        var placedAt: [String: Date] = [:]
+        /// Saved windows with no open window yet.
+        var waiting = 0
+        /// True once nothing is waiting and every placement has settled.
+        var isDone: Bool {
+            waiting == 0 && placedAt.values.allSatisfy { Date().timeIntervalSince($0) >= LayoutRestorer.launchSettle }
+        }
+    }
+
+    /// Put a just-launched app's windows back where they were saved for the current displays.
+    /// Apps open their windows wherever macOS chooses (often the display with the pointer), not
+    /// where they were when the app quit.
+    ///
+    /// Called repeatedly while the app opens its windows. Each saved window is placed, checked
+    /// for `launchSettle` seconds in case the app moves it again, and then left alone, so
+    /// moving it yourself right after launch sticks.
+    static func restoreApp(_ bundleID: String, setKey: String, progress: inout LaunchProgress) {
+        progress.waiting = 0
+        guard AXIsProcessTrusted(), let record = LayoutStore.shared.record(for: setKey) else { return }
+        let displays = DisplayInfo.liveDisplays()
+        let displaysByUUID = Dictionary(uniqueKeysWithValues: displays.map { ($0.uuid, $0) })
+        let saved = record.windows.filter { $0.appBundleID == bundleID && displaysByUUID[$0.displayUUID] != nil }
+        let live = WindowManager.currentWindows(bundleID: bundleID)
+        let assignment = LayoutMatcher.match(saved, to: live)
+        let now = Date()
+
+        for (i, layout) in saved.enumerated() {
+            if let at = progress.placedAt[layout.id], now.timeIntervalSince(at) >= launchSettle { continue }
+            guard let win = assignment[i], let disp = displaysByUUID[layout.displayUUID] else {
+                if progress.placedAt[layout.id] == nil { progress.waiting += 1 }
+                continue
+            }
+            let target = CGRect(x: disp.bounds.origin.x + layout.x, y: disp.bounds.origin.y + layout.y,
+                                width: layout.width, height: layout.height)
+            if win.frame.matches(target) {
+                if progress.placedAt[layout.id] == nil {
+                    progress.placedAt[layout.id] = now
+                    Log.write("  launch: \(layout.appName) idx=\(layout.windowIndex) opened in place at \(str(target))")
+                }
+                continue
+            }
+            let again = progress.placedAt[layout.id] != nil
+            let ok = WindowManager.setFrame(win.element, target)
+            let actual = WindowManager.frame(of: win.element) ?? .zero
+            // Placed even when the app refused the exact frame: take what it allows rather than
+            // fight it for the whole launch.
+            if !again { progress.placedAt[layout.id] = now }
+            Log.write("  launch: \(ok ? "OK  " : "BAD ") \(layout.appName) idx=\(layout.windowIndex) via=\(LayoutMatcher.reason(layout, win)) '\(win.title.prefix(24))'\(again ? " (app moved it back)" : "") from=\(str(win.frame)) want=\(str(target)) got=\(str(actual))")
+        }
+    }
+
     private static func str(_ r: CGRect) -> String {
         "(\(Int(r.origin.x)),\(Int(r.origin.y)) \(Int(r.width))x\(Int(r.height)))"
     }

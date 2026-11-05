@@ -18,7 +18,9 @@ enum WindowManager {
 
     // MARK: Enumeration
 
-    static func currentWindows() -> [LiveWindow] {
+    /// - Parameter bundleID: only this app's windows. Indices are per app, so they come out the
+    ///   same as in a full pass.
+    static func currentWindows(bundleID only: String? = nil) -> [LiveWindow] {
         guard AXIsProcessTrusted() else { return [] }
         var result: [LiveWindow] = []
         let ownPID = ProcessInfo.processInfo.processIdentifier
@@ -30,7 +32,8 @@ enum WindowManager {
         for app in NSWorkspace.shared.runningApplications {
             guard app.activationPolicy == .regular,
                   app.processIdentifier != ownPID,
-                  let bundleID = app.bundleIdentifier else { continue }
+                  let bundleID = app.bundleIdentifier,
+                  only == nil || bundleID == only else { continue }
 
             let appElement = AXUIElementCreateApplication(app.processIdentifier)
             // Right after a display change apps are busy re-laying out and answer AX slowly.

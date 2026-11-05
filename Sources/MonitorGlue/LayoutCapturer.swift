@@ -1,7 +1,7 @@
 import AppKit
 
-/// Continuously snapshots the positions of windows on external displays and persists
-/// the freshest layout per monitor-set. Built-in-display windows are ignored.
+/// Continuously snapshots the positions of windows and persists the freshest layout for the
+/// connected combination of displays.
 final class LayoutCapturer {
     static let shared = LayoutCapturer()
 
@@ -37,42 +37,46 @@ final class LayoutCapturer {
 
     func stop() { timer?.invalidate(); timer = nil }
 
+    /// Apps that just launched, and until when to leave their windows out of snapshots. A
+    /// launching app opens its windows wherever macOS puts them; recording that before the app's
+    /// saved places have been applied would overwrite them.
+    private var heldApps: [String: Date] = [:]
+
+    func hold(app bundleID: String, for seconds: TimeInterval) {
+        heldApps[bundleID] = Date().addingTimeInterval(seconds)
+    }
+
+    func release(app bundleID: String) {
+        heldApps[bundleID] = nil
+    }
+
     /// Take one snapshot now. Cheap no-op if nothing changed.
-    /// `force` bypasses the post-connect pause (used by tests).
+    /// `force` bypasses the post-connect pause and the unhandled-display-change check (used by tests).
     func capture(force: Bool = false) {
         guard AXIsProcessTrusted() else { return }
         guard force || Date() >= suppressedUntil else { return }
         let displays = DisplayInfo.liveDisplays()
         let managed = DisplayInfo.managedDisplays(displays)
         guard !managed.isEmpty else { return }
-        let managedUUIDs = Set(managed.map { $0.uuid })
 
         let setKey = DisplayInfo.monitorSetKey(for: displays)
         guard !setKey.isEmpty else { return }
-        currentSetKey = setKey
+        // The displays changed and the app has not handled it yet. Right after a monitor
+        // connects every window is still piled on the laptop screen; a snapshot now would save
+        // that pile as the monitor's layout before restore gets the chance to undo it.
+        guard force || setKey == currentSetKey else { return }
 
-        let live = WindowManager.currentWindows()
-        var layouts: [WindowLayout] = []
         let now = Date()
+        heldApps = heldApps.filter { $0.value > now }
+        let live = WindowManager.currentWindows().filter { heldApps[$0.appBundleID] == nil }
+        var layouts: [WindowLayout] = []
 
-        // Saved windows the user has moved off this layout's displays (onto the built-in screen,
-        // while monitors are connected): forget them, rather than pulling them back. Resolved with the same matcher restore uses, so
-        // the two always agree about which open window a saved entry refers to. Keying this on
-        // the window index instead made entries churn, because an app's window indices shift as
-        // its windows come and go.
-        var movedToBuiltIn = Set<String>()
-        if let saved = LayoutStore.shared.record(for: setKey)?.windows {
-            let matched = LayoutMatcher.match(saved, to: live)
-            for (i, win) in matched {
-                if let d = WindowManager.display(for: win, in: displays), !managedUUIDs.contains(d.uuid) {
-                    movedToBuiltIn.insert(saved[i].id)
-                }
-            }
-        }
-
+        // Every window on every display belongs to this layout, the laptop screen included:
+        // a window kept on the laptop while a monitor is connected has a place too, and that
+        // is where it should reopen. Each combination of displays still keeps its own layout,
+        // so this never touches what is remembered for the laptop on its own.
         for win in live {
-            // Only remember windows on the displays this layout covers.
-            guard let disp = WindowManager.display(for: win, in: displays), managedUUIDs.contains(disp.uuid) else { continue }
+            guard let disp = WindowManager.display(for: win, in: displays) else { continue }
             // Store the position RELATIVE to the display's origin, so restore works even when
             // the display comes back at a different arrangement origin next session.
             layouts.append(WindowLayout(
@@ -91,8 +95,7 @@ final class LayoutCapturer {
         guard !layouts.isEmpty else { return }
 
         // Diff: skip the write if the layout is unchanged (ignore timestamps).
-        let hash = (layouts.map { "\($0.appBundleID)\($0.windowIndex)\($0.x)\($0.y)\($0.width)\($0.height)" }
-            + movedToBuiltIn.sorted().map { "builtin:\($0)" })
+        let hash = layouts.map { "\($0.appBundleID)\($0.windowIndex)\($0.displayUUID)\($0.x)\($0.y)\($0.width)\($0.height)" }
             .joined().hashValue
         // Skip unchanged snapshots, but still write about once a day: the write refreshes each
         // window's "last seen" time, which is what keeps a window that simply never moves from
@@ -104,8 +107,7 @@ final class LayoutCapturer {
         LayoutStore.shared.upsert(
             setKey: setKey,
             displays: DisplayInfo.records(for: displays),
-            windows: layouts,
-            evictSlots: movedToBuiltIn
+            windows: layouts
         )
         Log.write("captured \(layouts.count) window(s) for \(managed.map { $0.localizedName }.joined(separator: " + "))")
     }

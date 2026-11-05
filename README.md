@@ -27,7 +27,10 @@ puts them back — right monitor, right position, right size — the moment you 
 - **Remembers per monitor.** Home and office layouts are kept apart and never overwrite each
   other.
 - **Remembers the laptop screen too.** Unplug and your windows go back to where you had them on
-  the built-in display, not wherever macOS dropped them.
+  the built-in display, not wherever macOS dropped them. Windows you keep on the laptop while a
+  monitor is connected are remembered as well.
+- **Reopens apps where they were.** Quit an app and open it again, and its windows go back to
+  where you left them instead of wherever macOS decides to open them.
 - **Restores automatically** when a monitor connects, when you open the lid, when the Mac wakes,
   and when you unlock. If you plug in at the lock screen, it waits and places everything the
   moment you unlock.
@@ -79,8 +82,9 @@ windows — never their contents. Everything else stays on your Mac:
 
 - **Monitors are identified by their hardware UUID**, not their macOS display ID (which changes
   on every reconnect). The set of attached external displays forms the key a layout is saved
-  under — so a home monitor and an office monitor never share a layout. With no monitor
-  attached, the built-in display gets a layout of its own.
+  under — so a home monitor and an office monitor never share a layout. Each layout
+  covers every window, on the monitors and on the laptop screen; with no monitor attached, the
+  built-in display gets a layout of its own.
 - **Positions are stored relative to the monitor's own origin.** macOS often brings a display
   back at a different place in its arrangement; relative coordinates still land correctly.
 - **Windows are read and moved with the Accessibility API**, matched back to saved entries by

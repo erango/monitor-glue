@@ -115,17 +115,10 @@ final class LayoutStore {
 
     /// Upsert a monitor set's metadata and merge in freshly captured windows.
     ///
-    /// Merges rather than replaces. A snapshot only sees windows that are on the external
-    /// display right now, so replacing wholesale would forget an app that is currently closed,
-    /// or one whose window the user happens to have parked on the built-in screen. Entries not
-    /// present in this snapshot are kept as they were, which is also what makes sizes "belong"
-    /// to the monitor: only a change made while the window is on that monitor updates it.
-    /// - Parameter evictSlots: ids of saved windows whose open window is currently on the
-    ///   built-in display. The user moved them off this monitor deliberately, so stop managing
-    ///   them here. A saved window with no live window at all is left alone - that is an app
-    ///   that simply is not open.
-    func upsert(setKey: String, displays: [DisplayInfoRecord], windows: [WindowLayout],
-                evictSlots: Set<String> = []) {
+    /// Merges rather than replaces. A snapshot only sees the windows that are open right now,
+    /// so replacing wholesale would forget every app that is currently closed. Entries not in
+    /// this snapshot are kept as they were, and are what an app gets back when it reopens.
+    func upsert(setKey: String, displays: [DisplayInfoRecord], windows: [WindowLayout]) {
         queue.sync {
             var record = data.monitorSets[setKey]
                 ?? MonitorSetRecord(key: setKey, displays: displays, lastSeen: Date(), windows: [])
@@ -141,9 +134,6 @@ final class LayoutStore {
                 } else {
                     merged.append(captured)
                 }
-            }
-            if !evictSlots.isEmpty {
-                merged.removeAll { evictSlots.contains($0.id) }
             }
             record.windows = merged
             data.monitorSets[setKey] = LayoutStore.pruned(record)

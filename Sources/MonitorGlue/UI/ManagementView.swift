@@ -225,6 +225,11 @@ private struct SetCard: View {
             Text(win.windowTitle.isEmpty ? "Window \(win.windowIndex + 1)" : win.windowTitle)
                 .font(.system(size: 12.5)).lineLimit(1)
             Spacer()
+            // A monitor layout also remembers windows kept on the laptop screen; say so, or
+            // their coordinates read as a spot on the monitor.
+            if !DisplayInfo.isBuiltInOnly(set.key), !set.displays.contains(where: { $0.uuid == win.displayUUID }) {
+                Text("Laptop screen").font(.system(size: 11)).foregroundStyle(.secondary)
+            }
             Text(verbatim: "\(Int(win.x)), \(Int(win.y))  ·  \(Int(win.width))×\(Int(win.height))")
                 .font(.system(size: 11, design: .monospaced))
                 .foregroundStyle(.tertiary)
