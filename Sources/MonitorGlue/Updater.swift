@@ -18,7 +18,14 @@ final class Updater: NSObject, SPUStandardUserDriverDelegate {
     /// Whether Sparkle checks on its own schedule. Sparkle asks on the second launch; this is
     /// the way to change the answer later, so "you can turn it off" is actually true.
     var automaticallyChecks: Bool {
-        get { controller.updater.automaticallyChecksForUpdates }
+        get {
+            #if DEBUG
+            // The preview harness runs an unbundled binary, where starting Sparkle only shows
+            // an error alert.
+            if DebugPreview.requested != nil { return true }
+            #endif
+            return controller.updater.automaticallyChecksForUpdates
+        }
         set { controller.updater.automaticallyChecksForUpdates = newValue }
     }
 

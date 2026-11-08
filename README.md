@@ -43,7 +43,7 @@ puts them back — right monitor, right position, right size — the moment you 
   that stands out in your menu bar: a glue bottle, a pinned window, or a monitor.
 
 <p align="center">
-  <img src="docs/screenshots/menu.png" width="368" alt="Monitor Glue menu-bar menu">
+  <img src="docs/screenshots/menu.png" width="355" alt="Monitor Glue menu-bar menu">
   <img src="docs/screenshots/manager.png" width="460" alt="Remembered monitors and windows">
 </p>
 

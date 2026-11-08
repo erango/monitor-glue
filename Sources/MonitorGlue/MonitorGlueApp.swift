@@ -16,7 +16,7 @@ struct MonitorGlueApp: App {
         } label: {
             Image(nsImage: AppGlyph.menuBarTemplate(iconStyle))
         }
-        .menuBarExtraStyle(.window)
+        .menuBarExtraStyle(.menu)
 
         Window("Monitor Glue", id: "manager") {
             ManagementView()
@@ -106,6 +106,14 @@ final class AppModel: ObservableObject {
         }
 
         refreshStatus()
+
+        // The menu is a real NSMenu now, with no view lifecycle to hook; refresh its status
+        // lines whenever it opens.
+        NotificationCenter.default.addObserver(forName: NSMenu.didBeginTrackingNotification,
+                                               object: nil, queue: .main) { [weak self] _ in
+            self?.refreshStatus()
+            LoginItem.shared.refresh()
+        }
     }
 
     /// Waking is when layouts are most likely to be wrong and least likely to be noticed: the

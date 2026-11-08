@@ -1,330 +1,143 @@
 import SwiftUI
 
+/// The menu-bar menu. Rendered with `.menuBarExtraStyle(.menu)`, so SwiftUI builds a real
+/// `NSMenu` from these views: system font, spacing, highlight, submenus, checkmarks and
+/// keyboard shortcuts all come from AppKit, and it looks like every other menu-bar menu.
+/// That only works with menu-shaped content - buttons, toggles, pickers, text and dividers.
 struct MenuBarContent: View {
     @EnvironmentObject var model: AppModel
     @EnvironmentObject var permissions: Permissions
-    @StateObject private var loginItem = LoginItem.shared
+    @ObservedObject private var loginItem = LoginItem.shared
     @Environment(\.openWindow) private var openWindow
-    @Environment(\.dismiss) private var dismiss
-    @State private var autoUpdates = Updater.shared.automaticallyChecks
     @AppStorage(MenuBarIconStyle.defaultsKey) private var iconStyle = MenuBarIconStyle.default
 
     var body: some View {
-        // Native menus keep their items flush against each other and reserve the breathing
-        // room for the separators, so rows sit in zero-spacing stacks and each divider
-        // carries its own small margin.
-        VStack(alignment: .leading, spacing: 0) {
-            header
-            separator
+        status
 
-            if permissions.isTrusted {
-                statusBlock
-            } else {
-                permissionWarning
-            }
+        Divider()
 
-            separator
-
-            VStack(alignment: .leading, spacing: 0) {
-                MenuRow(title: "Restore windows now", icon: MGIcon.restore,
-                        shortcut: "⌘R", disabled: !canRestore,
-                        action: choose { model.restoreNow() })
-                MenuRow(title: "Open Manager…", icon: MGIcon.manager,
-                        action: choose {
-                            openWindow(id: "manager")
-                            NSApp.activate(ignoringOtherApps: true)
-                        })
-            }
-
-            separator
-
-            launchAtLoginRow
-
-            separator
-
-            MenuRow(title: "Check for Updates…", icon: MGIcon.update,
-                    action: choose { Updater.shared.checkForUpdates() })
-            MenuRow(title: "Report a Bug…", icon: MGIcon.bug,
-                    action: choose { BugReport.open() })
-
-            MenuRow(title: "Quit Monitor Glue", icon: MGIcon.power, shortcut: "⌘Q") {
-                NSApp.terminate(nil)
-            }
-
-            separator
-            footer
+        Button {
+            model.restoreNow()
+        } label: {
+            Label("Restore Windows Now", systemImage: "arrow.counterclockwise")
         }
-        .padding(.vertical, 6)
-        .padding(.horizontal, 10)
-        .frame(width: 320)
-        .onAppear {
-            model.refreshStatus()
-            loginItem.refresh()
-            autoUpdates = Updater.shared.automaticallyChecks
+        .keyboardShortcut("r")
+        .disabled(!canRestore)
+
+        Button {
+            openWindow(id: "manager")
+            NSApp.activate(ignoringOtherApps: true)
+        } label: {
+            Label("Open Manager…", systemImage: "list.bullet.rectangle")
         }
-    }
+        .keyboardShortcut(",")
 
-    /// Menu separator: a hairline with the small symmetric margin AppKit uses.
-    private var separator: some View {
-        Divider().padding(.vertical, 5)
-    }
+        Divider()
 
-    /// A checkable item, the way AppKit menus do it: an ordinary highlightable row with a
-    /// leading checkmark when on (rather than an embedded checkbox control, which cannot
-    /// highlight on hover and reads as a form field inside a menu).
-    private var launchAtLoginRow: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            MenuRow(title: "Launch at login", icon: nil,
-                    checked: loginItem.isEnabled,
-                    action: choose { loginItem.setEnabled(!loginItem.isEnabled) })
-            MenuRow(title: "Check for updates automatically", icon: nil,
-                    checked: autoUpdates,
-                    action: choose {
-                        Updater.shared.automaticallyChecks.toggle()
-                        autoUpdates = Updater.shared.automaticallyChecks
-                    })
-            iconPicker
-        }
-    }
-
-    /// Choose the menu-bar glyph in place. It stays open on purpose: the point is to watch the
-    /// icon change up in the menu bar and compare.
-    private var iconPicker: some View {
-        HStack(spacing: 9) {
-            Color.clear.frame(width: 17, height: 1)
-            Text("Menu bar icon").font(.system(size: 13))
-            Spacer(minLength: 8)
-            HStack(spacing: 2) {
-                ForEach(MenuBarIconStyle.allCases) { style in
-                    IconChoice(style: style, selected: iconStyle == style) { iconStyle = style }
+        Toggle("Launch at Login", isOn: Binding(
+            get: { loginItem.isEnabled },
+            set: { loginItem.setEnabled($0) }))
+        Toggle("Check for Updates Automatically", isOn: Binding(
+            get: { Updater.shared.automaticallyChecks },
+            set: { Updater.shared.automaticallyChecks = $0 }))
+        Picker("Menu Bar Icon", selection: $iconStyle) {
+            ForEach(MenuBarIconStyle.allCases) { style in
+                Label {
+                    Text(style.title)
+                } icon: {
+                    Image(nsImage: AppGlyph.menuBarTemplate(style))
                 }
+                .tag(style)
             }
         }
-        .padding(.vertical, 2).padding(.horizontal, 8)
+        .pickerStyle(.menu)
+
+        Divider()
+
+        Button {
+            Updater.shared.checkForUpdates()
+        } label: {
+            Label("Check for Updates…", systemImage: "arrow.down.circle")
+        }
+        Button {
+            BugReport.open()
+        } label: {
+            Label("Report a Bug…", systemImage: "ladybug")
+        }
+        Button {
+            NSWorkspace.shared.open(URL(string: "https://ko-fi.com/erango")!)
+        } label: {
+            Label("Buy Me a Coffee…", systemImage: "cup.and.saucer")
+        }
+        Button("About Monitor Glue") { showAbout() }
+
+        Divider()
+
+        Button {
+            NSApp.terminate(nil)
+        } label: {
+            Label("Quit Monitor Glue", systemImage: "power")
+        }
+        .keyboardShortcut("q")
     }
 
     private var canRestore: Bool {
         permissions.isTrusted && !model.currentSetKey.isEmpty
     }
 
-    /// Choosing an item in a real menu closes it. `MenuBarExtra`'s window style is a plain
-    /// panel rather than an `NSMenu`, so it stays open until dismissed explicitly.
-    private func closeMenu() {
-        dismiss()   // documented path; a no-op in some macOS versions for this scene type
-        for window in NSApp.windows where window.isVisible
-            && String(describing: type(of: window)).contains("MenuBarExtraWindow") {
-            window.close()
-        }
-    }
-
-    /// Run a menu item's action, then close the menu, the way an AppKit menu behaves.
-    private func choose(_ action: @escaping () -> Void) -> () -> Void {
-        {
-            action()
-            closeMenu()
-        }
-    }
-
-    // MARK: Header
-
-    private var header: some View {
-        HStack(spacing: 8) {
-            MenuBarGlyph(style: iconStyle)
-                .foregroundStyle(Theme.accent)
-                .frame(width: 17, height: 17)
-            Text("Monitor Glue").font(.system(size: 14.5, weight: .semibold))
-        }
-    }
-
     // MARK: Status
 
-    private var statusBlock: some View {
-        HStack(alignment: .top, spacing: 8) {
-            Image(systemName: "checkmark.circle.fill")
-                .font(.system(size: 15))
-                .foregroundStyle(Theme.green)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(model.connectedExternalDisplays > 0
-                     ? "Tracking · \(model.connectedExternalDisplays) display\(model.connectedExternalDisplays == 1 ? "" : "s") connected"
-                     : "Tracking · built-in display")
-                    .font(.system(size: 13, weight: .semibold))
-                if !model.currentSetLabel.isEmpty {
-                    Text("\(model.currentSetLabel) · \(model.currentSetWindowCount) window\(model.currentSetWindowCount == 1 ? "" : "s")")
-                        .font(.system(size: 11.5))
-                        .foregroundStyle(.secondary)
-                }
-                Text("\(model.rememberedCount) layout\(model.rememberedCount == 1 ? "" : "s") · \(model.totalWindowsRemembered) window\(model.totalWindowsRemembered == 1 ? "" : "s") remembered")
-                    .font(.system(size: 11.5))
-                    .foregroundStyle(.tertiary)
-            }
-            Spacer(minLength: 0)
-        }
-    }
-
-    private var permissionWarning: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 6) {
-                Image(systemName: "exclamationmark.triangle.fill")
-                    .foregroundStyle(Theme.orange)
-                Text("Accessibility access required")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(Theme.orange)
-            }
-            Text("Monitor Glue needs Accessibility access to read and move app windows.")
-                .font(.system(size: 11.5))
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-            Button("Grant access…", action: choose { permissions.requestAccess() })
-                .buttonStyle(.borderedProminent)
-                .controlSize(.small)
-        }
-        .padding(10)
-        .background(
-            RoundedRectangle(cornerRadius: 9, style: .continuous)
-                .fill(Theme.orange.opacity(0.10))
-                .overlay(RoundedRectangle(cornerRadius: 9, style: .continuous)
-                    .strokeBorder(Theme.orange.opacity(0.34)))
-        )
-    }
-
-    // MARK: Footer
-
-    private var footer: some View {
-        VStack(spacing: 9) {
-            HStack(spacing: 0) {
-                Text("Made with ")
-                Text("♥").foregroundStyle(Theme.coral)
-                Text(" by ")
-                HoverLink(url: URL(string: "https://github.com/erango")!, onOpen: closeMenu) { hovering in
-                    Text("@erango")
-                        .foregroundStyle(Theme.accent)
-                        .underline(hovering)
-                }
-            }
-            .font(.system(size: 11.5))
-            .foregroundStyle(.secondary)
-
-            HoverLink(url: URL(string: "https://ko-fi.com/erango")!, onOpen: closeMenu) { hovering in
-                HStack(spacing: 7) {
-                    MGIcon.kofiCup.frame(width: 17, height: 16)
-                    Text("Buy me a coffee").font(.system(size: 12, weight: .semibold))
-                }
-                .foregroundStyle(.white)
-                .padding(.vertical, 6).padding(.horizontal, 14)
-                .background(
-                    RoundedRectangle(cornerRadius: 9, style: .continuous)
-                        .fill(Theme.kofi)
-                        .brightness(hovering ? 0.07 : 0)
-                )
-                .shadow(color: Theme.kofi.opacity(hovering ? 0.55 : 0.4),
-                        radius: hovering ? 6 : 4, y: 2)
-            }
-        }
-        .frame(maxWidth: .infinity)
-    }
-}
-
-/// A link that exposes its hover state to its label. SwiftUI's `Link` reports no hover, which
-/// is why the Ko-fi button felt dead; a plain `Button` with `onHover` behaves like the rows.
-///
-/// Deliberately does not touch `NSCursor`: push/pop leaks a stuck pointing-hand cursor
-/// system-wide if the popover closes while the pointer is still inside, and AppKit menus
-/// don't change the cursor anyway.
-private struct HoverLink<Label: View>: View {
-    let url: URL
-    var onOpen: () -> Void = {}
-    @ViewBuilder let label: (Bool) -> Label
-
-    @State private var hovering = false
-
-    var body: some View {
-        Button {
-            NSWorkspace.shared.open(url)
-            onOpen()
-        } label: {
-            label(hovering)
-        }
-        .buttonStyle(.plain)
-        .contentShape(Rectangle())
-        .onHover { hovering = $0 }
-    }
-}
-
-/// One option in the menu-bar icon picker: the glyph on a small selectable tile.
-private struct IconChoice: View {
-    let style: MenuBarIconStyle
-    let selected: Bool
-    let action: () -> Void
-    @State private var hovering = false
-
-    var body: some View {
-        Button(action: action) {
-            MenuBarGlyph(style: style)
-                .frame(width: 16, height: 16)
-                .foregroundStyle(selected ? AnyShapeStyle(.white) : AnyShapeStyle(.primary))
-                .frame(width: 26, height: 22)
-                .background(
-                    RoundedRectangle(cornerRadius: 5, style: .continuous)
-                        .fill(selected ? Theme.accent
-                              : (hovering ? Theme.controlFill : Color.clear))
-                )
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .onHover { hovering = $0 }
-        .help(style.title)
-        .accessibilityLabel("\(style.title) menu bar icon")
-        .accessibilityAddTraits(selected ? .isSelected : [])
-    }
-}
-
-/// Full-width menu row with accent hover highlight and an optional trailing shortcut.
-private struct MenuRow: View {
-    let title: String
-    /// Leading glyph. `nil` for checkable items, which use the checkmark slot instead.
-    let icon: SVGIcon?
-    var shortcut: String? = nil
-    var disabled: Bool = false
-    /// When non-nil the row is checkable and shows a checkmark in the leading slot when true.
-    var checked: Bool? = nil
-    let action: () -> Void
-
-    @State private var hovering = false
-
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 9) {
-                leading.frame(width: 17)
-                Text(title).font(.system(size: 13))
-                Spacer(minLength: 8)
-                if let shortcut {
-                    Text(shortcut).font(.system(size: 11)).opacity(0.55)
-                }
-            }
-            .foregroundStyle(disabled ? AnyShapeStyle(.tertiary)
-                             : (hovering ? AnyShapeStyle(.white) : AnyShapeStyle(.primary)))
-            // ~22pt tall, matching an AppKit menu item.
-            .padding(.vertical, 4).padding(.horizontal, 8)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(
-                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .fill(hovering && !disabled ? Theme.accent : Color.clear)
-            )
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .disabled(disabled)
-        .onHover { hovering = $0 && !disabled }
-    }
-
+    /// Status lines at the top, as disabled items - the same way other menu-bar apps show
+    /// state ("Running", "Connected to …").
     @ViewBuilder
-    private var leading: some View {
-        if let icon {
-            icon.frame(width: 14, height: 14)
-        } else if let checked {
-            Image(systemName: "checkmark")
-                .font(.system(size: 11, weight: .semibold))
-                .opacity(checked ? 1 : 0)
+    private var status: some View {
+        if permissions.isTrusted {
+            Label {
+                Text(model.connectedExternalDisplays > 0
+                     ? "Tracking \(model.connectedExternalDisplays) display\(model.connectedExternalDisplays == 1 ? "" : "s")"
+                     : "Tracking the built-in display")
+            } icon: {
+                Image(nsImage: Self.statusDot(.systemGreen))
+            }
+            if !model.currentSetLabel.isEmpty {
+                Text("\(model.currentSetLabel) · \(model.currentSetWindowCount) window\(model.currentSetWindowCount == 1 ? "" : "s")")
+            }
+        } else {
+            Label {
+                Text("Accessibility access needed")
+            } icon: {
+                Image(nsImage: Self.statusDot(.systemOrange))
+            }
+            Button("Grant Access…") { permissions.requestAccess() }
         }
+    }
+
+    /// A small coloured dot. Not a template image, so the menu keeps its colour.
+    private static func statusDot(_ color: NSColor) -> NSImage {
+        let image = NSImage(size: NSSize(width: 10, height: 10), flipped: false) { rect in
+            color.setFill()
+            NSBezierPath(ovalIn: rect.insetBy(dx: 1, dy: 1)).fill()
+            return true
+        }
+        image.isTemplate = false
+        return image
+    }
+
+    // MARK: About
+
+    private func showAbout() {
+        let credits = NSMutableAttributedString(
+            string: "Made with ♥ by ",
+            attributes: [.font: NSFont.systemFont(ofSize: 11), .foregroundColor: NSColor.secondaryLabelColor])
+        credits.append(NSAttributedString(
+            string: "@erango",
+            attributes: [.font: NSFont.systemFont(ofSize: 11),
+                         .link: URL(string: "https://github.com/erango")!]))
+        let centered = NSMutableParagraphStyle()
+        centered.alignment = .center
+        credits.addAttribute(.paragraphStyle, value: centered,
+                             range: NSRange(location: 0, length: credits.length))
+        NSApp.activate(ignoringOtherApps: true)
+        NSApp.orderFrontStandardAboutPanel(options: [.credits: credits])
     }
 }

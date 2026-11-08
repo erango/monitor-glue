@@ -8,8 +8,6 @@ enum Theme {
     static let accent = Color.accentColor
     static let brandTop = Color(red: 0x3a/255, green: 0x8b/255, blue: 0xff/255)
     static let brandBottom = Color(red: 0x14/255, green: 0x57/255, blue: 0xd8/255)
-    static let coral = Color(red: 0xFF/255, green: 0x5A/255, blue: 0x5F/255)
-    static let kofi = Color(red: 0x29/255, green: 0xAB/255, blue: 0xE0/255)
 
     // Status (system-semantic)
     static let green = Color(nsColor: .systemGreen)

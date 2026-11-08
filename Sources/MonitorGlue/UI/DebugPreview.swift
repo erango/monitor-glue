@@ -127,15 +127,13 @@ enum DebugPreview {
         if what == "menu" { Permissions.shared._setPreviewTrusted(true) }
         AppModel.shared.currentSetKey = "UUID-DELL"
         AppModel.shared.refreshStatus()
-        // Sample status counts (no live displays in the harness). Applied again once the menu
-        // is up, since its onAppear refreshes the status from the real displays.
+        // Sample status counts (no live displays in the harness).
         func sampleStatus() {
             AppModel.shared.connectedExternalDisplays = 1
             AppModel.shared.currentSetLabel = "Dell U2720Q"
             AppModel.shared.currentSetWindowCount = 5
         }
         sampleStatus()
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { sampleStatus() }
         if what == "manager" { showManager() }
         if what == "menu" { showMenu() }
     }
@@ -492,22 +490,26 @@ enum DebugPreview {
         NSApp.terminate(nil)
     }
 
+    /// Open the real status-item menu, the same NSMenu users see.
     private static func showMenu() {
-        let view = MenuBarContent()
-            .environmentObject(AppModel.shared)
-            .environmentObject(Permissions.shared)
-            .background(VisualEffect())
-            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-            .padding(24)   // room for the shadow in screenshots
-        let hosting = NSHostingController(rootView: view)
-        let win = NSWindow(contentViewController: hosting)
-        win.styleMask = [.borderless]
-        win.isOpaque = false
-        win.backgroundColor = .clear
-        win.hasShadow = false
-        win.title = "Monitor Glue Menu"
-        if ProcessInfo.processInfo.environment["MG_APPEARANCE"] == "light" { win.appearance = NSAppearance(named: .aqua) }
-        placeOnBuiltIn(win)
+        if ProcessInfo.processInfo.environment["MG_APPEARANCE"] == "light" { NSApp.appearance = NSAppearance(named: .aqua) }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+            // The status item may sit behind the notch on a crowded menu bar, so pop its menu
+            // up at a fixed spot on screen rather than clicking the item.
+            let menu = NSApp.windows
+                .filter { String(describing: type(of: $0)).contains("StatusBar") }
+                .compactMap { ($0.value(forKey: "statusItem") as? NSStatusItem)?.menu }
+                .first
+            // SwiftUI fills the menu lazily, when AppKit asks for it.
+            if let menu { menu.delegate?.menuNeedsUpdate?(menu) }
+            // On the built-in Retina screen, so screenshots come out at 2x.
+            let builtIn = NSScreen.screens.first {
+                ($0.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)
+                    .map { CGDisplayIsBuiltin(CGDirectDisplayID(truncating: $0)) != 0 } ?? false
+            } ?? NSScreen.main
+            let f = builtIn?.visibleFrame ?? .zero
+            menu?.popUp(positioning: nil, at: NSPoint(x: f.midX, y: f.maxY - 40), in: nil)
+        }
     }
 
     /// Screenshots should come out at 2x, so put preview windows on the built-in Retina screen.
@@ -532,16 +534,5 @@ extension CGRect {
         abs(origin.x - o.origin.x) < tol && abs(origin.y - o.origin.y) < tol &&
         abs(width - o.width) < tol && abs(height - o.height) < tol
     }
-}
-/// The frosted material the real menu-bar popover uses.
-private struct VisualEffect: NSViewRepresentable {
-    func makeNSView(context: Context) -> NSVisualEffectView {
-        let v = NSVisualEffectView()
-        v.material = .menu
-        v.blendingMode = .behindWindow
-        v.state = .active
-        return v
-    }
-    func updateNSView(_ nsView: NSVisualEffectView, context: Context) {}
 }
 #endif

@@ -143,42 +143,9 @@ struct SVGIcon: View {
     }
 }
 
-// MARK: - The handoff's menu/footer icons
+// MARK: - Manager icons
 
 enum MGIcon {
-    /// Restore: undo-style arrow (chevron + semicircular return).
-    static var restore: SVGIcon {
-        SVGIcon(viewBox: 16, elements: [
-            .init(d: "M5.5 4 2.4 7.1 5.5 10.2", style: .strokeCurrent(1.4, true)),
-            .init(d: "M2.7 7.1H9.6a3.6 3.6 0 0 1 0 7.2H6.2", style: .strokeCurrent(1.4, true)),
-        ])
-    }
-    /// Open Manager: a window/screen with a top bar.
-    static var manager: SVGIcon {
-        SVGIcon(viewBox: 16, elements: [
-            .init(d: "M2.4 5.6h11.2a1.5 1.5 0 0 1 1.5 1.5v4.4a1.5 1.5 0 0 1-1.5 1.5H2.4a1.5 1.5 0 0 1-1.5-1.5V7.1a1.5 1.5 0 0 1 1.5-1.5Z", style: .strokeCurrent(1.3, false)),
-            .init(d: "M4.6 3.6h6.8", style: .strokeCurrent(1.3, true)),
-        ])
-    }
-    /// Quit: power symbol.
-    static var power: SVGIcon {
-        SVGIcon(viewBox: 16, elements: [
-            .init(d: "M8 2.4v5.2", style: .strokeCurrent(1.5, true)),
-            .init(d: "M4.9 4.5a4.6 4.6 0 1 0 6.2 0", style: .strokeCurrent(1.5, true)),
-        ])
-    }
-    /// Ko-fi coffee cup with steam + coral heart (fixed colors, white on the blue pill).
-    static var kofiCup: SVGIcon {
-        SVGIcon(viewBox: 24, elements: [
-            .init(d: "M5 9h11v4.5a4.5 4.5 0 0 1-4.5 4.5h-2A4.5 4.5 0 0 1 5 13.5V9Z", style: .fill(.white)),
-            .init(d: "M16 10.2h1.6a2.4 2.4 0 0 1 0 4.8H16", style: .stroke(.white, 1.5, false, 1)),
-            .init(d: "M4 20.4h13", style: .stroke(.white, 1.6, true, 1)),
-            .init(d: "M8.6 6.6c0-1 .8-1.3.8-2.3", style: .stroke(.white, 1.4, true, 0.85)),
-            .init(d: "M11.9 6.6c0-1 .8-1.3.8-2.3", style: .stroke(.white, 1.4, true, 0.85)),
-            .init(d: "M9.1 11.1c.5-.7 1.6-.5 1.6.4 0 .9-1.6 1.9-1.6 1.9s-1.6-1-1.6-1.9c0-.9 1.1-1.1 1.6-.4Z",
-                  style: .fill(Theme.coral)),
-        ])
-    }
     /// Trash (delete set / delete app).
     static var trash: SVGIcon {
         SVGIcon(viewBox: 16, elements: [
@@ -191,22 +158,6 @@ enum MGIcon {
         SVGIcon(viewBox: 16, elements: [
             .init(d: "M14.4 8a6.4 6.4 0 1 0-12.8 0a6.4 6.4 0 1 0 12.8 0Z", style: .strokeCurrent(1.3, false)),
             .init(d: "M6 6l4 4M10 6l-4 4", style: .strokeCurrent(1.3, true)),
-        ])
-    }
-    /// Report a bug: a small beetle, drawn in the same stroke style as the other menu glyphs.
-    static var bug: SVGIcon {
-        SVGIcon(viewBox: 16, elements: [
-            .init(d: "M5.2 7.6a2.8 2.8 0 0 1 5.6 0v2.6a2.8 2.8 0 0 1-5.6 0Z", style: .strokeCurrent(1.3, true)),
-            .init(d: "M6.3 5.6a1.7 1.7 0 0 1 3.4 0", style: .strokeCurrent(1.3, true)),
-            .init(d: "M8 7.4v5.5", style: .strokeCurrent(1.1, true)),
-            .init(d: "M5.2 8.8H3.2M10.8 8.8h2M5.4 11.2l-1.7 1.2M10.6 11.2l1.7 1.2M5.6 6.6 4.2 5.3M10.4 6.6l1.4-1.3", style: .strokeCurrent(1.2, true)),
-        ])
-    }
-    /// Check for updates: a downward arrow into a tray, in the same stroke style.
-    static var update: SVGIcon {
-        SVGIcon(viewBox: 16, elements: [
-            .init(d: "M8 2.6v7.2M5.1 7.1 8 10l2.9-2.9", style: .strokeCurrent(1.4, true)),
-            .init(d: "M2.8 10.4v1.4a1.6 1.6 0 0 0 1.6 1.6h7.2a1.6 1.6 0 0 0 1.6-1.6v-1.4", style: .strokeCurrent(1.3, true)),
         ])
     }
 }
