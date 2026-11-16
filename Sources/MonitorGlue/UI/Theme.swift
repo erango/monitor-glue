@@ -168,6 +168,40 @@ enum AppGlyph {
         image.isTemplate = true
         return image
     }
+
+    /// The menu-bar icon with a red dot at its top-right, for "an update is waiting". The image
+    /// is a few points wider so the dot sits beside the glyph rather than on top of it (it
+    /// would cover the bottle's drop and the window's pin). A template image cannot carry
+    /// colour, so this one is drawn on demand: the glyph in the label colour of whatever menu
+    /// bar it lands in (light, dark, or tinted by the wallpaper), with a small gap cut around
+    /// the dot where they meet.
+    @MainActor static func menuBarBadged(_ style: MenuBarIconStyle = .default) -> NSImage {
+        let glyph = menuBarTemplate(style)
+        let extra: CGFloat = 5
+        let size = NSSize(width: glyph.size.width + extra, height: glyph.size.height)
+        let image = NSImage(size: size, flipped: false) { rect in
+            guard let ctx = NSGraphicsContext.current?.cgContext,
+                  let mask = glyph.cgImage(forProposedRect: nil, context: nil, hints: nil) else { return false }
+            let glyphRect = CGRect(origin: .zero, size: glyph.size)
+            ctx.saveGState()
+            ctx.clip(to: glyphRect, mask: mask)
+            NSColor.labelColor.setFill()
+            ctx.fill(glyphRect)
+            ctx.restoreGState()
+
+            let r: CGFloat = 3
+            let center = CGPoint(x: rect.maxX - r - 0.5, y: rect.maxY - r - 1)
+            ctx.setBlendMode(.clear)
+            ctx.fillEllipse(in: CGRect(x: center.x - r - 1.5, y: center.y - r - 1.5,
+                                       width: 2 * (r + 1.5), height: 2 * (r + 1.5)))
+            ctx.setBlendMode(.normal)
+            NSColor.systemRed.setFill()
+            ctx.fillEllipse(in: CGRect(x: center.x - r, y: center.y - r, width: 2 * r, height: 2 * r))
+            return true
+        }
+        image.isTemplate = false
+        return image
+    }
 }
 
 /// Brand app-icon squircle (onboarding) — the white brand mark on the brand gradient.

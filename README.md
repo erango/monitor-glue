@@ -66,7 +66,8 @@ Security → Accessibility). This is the only permission it needs.
 
 Requires macOS 14 Sonoma or later. The app is signed with a Developer ID and notarized by Apple,
 and keeps itself up to date: choose **Check for Updates…** in the menu, or let it check
-automatically.
+automatically. When an update is waiting, a red dot appears on the menu-bar icon and the menu
+offers it at the top — no window pops up while you work.
 
 ## Privacy
 

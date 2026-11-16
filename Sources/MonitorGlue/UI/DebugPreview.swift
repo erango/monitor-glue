@@ -126,6 +126,7 @@ enum DebugPreview {
         }
         seedSampleData()
         if what == "menu" { Permissions.shared._setPreviewTrusted(true) }
+        if let v = ProcessInfo.processInfo.environment["MG_UPDATE"] { Updater.shared._setPreviewAvailable(v) }
         AppModel.shared.currentSetKey = "UUID-DELL"
         AppModel.shared.refreshStatus()
         // Sample status counts (no live displays in the harness).
@@ -486,10 +487,11 @@ enum DebugPreview {
     }
 
     @MainActor private static func dumpMenuBarGlyph() {
-        // Every menu-bar style side by side, on a light and a dark strip.
+        // Every menu-bar style side by side, on a light and a dark strip; above them the same
+        // with the "update available" dot, drawn under each appearance as the menu bar would.
         let styles = MenuBarIconStyle.allCases
         let tileH = 44.0, tileW = 60.0, g = 18.0
-        let tile = NSImage(size: NSSize(width: tileW * Double(styles.count), height: tileH * 2))
+        let tile = NSImage(size: NSSize(width: tileW * Double(styles.count), height: tileH * 4))
         tile.lockFocus()
         for (row, (bg, ink)) in [(NSColor.white, NSColor.black), (NSColor(white: 0.16, alpha: 1), NSColor.white)].enumerated() {
             bg.setFill()
@@ -506,6 +508,19 @@ enum DebugPreview {
                 local.fill(using: .sourceAtop)
                 tinted.unlockFocus()
                 tinted.draw(in: r, from: .zero, operation: .sourceOver, fraction: 1.0)
+            }
+        }
+        for (row, (bg, name)) in [(NSColor.white, NSAppearance.Name.aqua), (NSColor(white: 0.16, alpha: 1), .darkAqua)].enumerated() {
+            let y = Double(row + 2) * tileH
+            bg.setFill()
+            NSRect(x: 0, y: y, width: tileW * Double(styles.count), height: tileH).fill()
+            for (i, style) in styles.enumerated() {
+                let badged = AppGlyph.menuBarBadged(style)
+                let r = NSRect(x: Double(i) * tileW + (tileW - badged.size.width) / 2, y: y + (tileH - badged.size.height) / 2,
+                               width: badged.size.width, height: badged.size.height)
+                NSAppearance(named: name)?.performAsCurrentDrawingAppearance {
+                    badged.draw(in: r, from: .zero, operation: .sourceOver, fraction: 1.0)
+                }
             }
         }
         tile.unlockFocus()

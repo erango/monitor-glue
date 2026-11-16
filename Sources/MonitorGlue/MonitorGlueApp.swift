@@ -7,6 +7,7 @@ struct MonitorGlueApp: App {
     @StateObject private var model = AppModel.shared
     @StateObject private var permissions = Permissions.shared
     @AppStorage(MenuBarIconStyle.defaultsKey) private var iconStyle = MenuBarIconStyle.default
+    @ObservedObject private var updater = Updater.shared
 
     var body: some Scene {
         MenuBarExtra {
@@ -14,7 +15,9 @@ struct MonitorGlueApp: App {
                 .environmentObject(model)
                 .environmentObject(permissions)
         } label: {
-            Image(nsImage: AppGlyph.menuBarTemplate(iconStyle))
+            Image(nsImage: updater.availableVersion == nil
+                  ? AppGlyph.menuBarTemplate(iconStyle)
+                  : AppGlyph.menuBarBadged(iconStyle))
         }
         .menuBarExtraStyle(.menu)
 

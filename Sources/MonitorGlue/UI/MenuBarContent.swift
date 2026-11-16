@@ -10,8 +10,22 @@ struct MenuBarContent: View {
     @ObservedObject private var loginItem = LoginItem.shared
     @Environment(\.openWindow) private var openWindow
     @AppStorage(MenuBarIconStyle.defaultsKey) private var iconStyle = MenuBarIconStyle.default
+    @ObservedObject private var updater = Updater.shared
 
     var body: some View {
+        if let version = updater.availableVersion {
+            Button {
+                Updater.shared.checkForUpdates()
+            } label: {
+                Label {
+                    Text("Update to \(version)…")
+                } icon: {
+                    Image(nsImage: Self.statusDot(.systemRed))
+                }
+            }
+            Divider()
+        }
+
         status
 
         Divider()
