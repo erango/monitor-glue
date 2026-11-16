@@ -157,6 +157,8 @@ final class AppModel: ObservableObject {
     private func placeLaunchedApp(_ bundleID: String, name: String) {
         let key = currentSetKey
         guard Permissions.shared.isTrusted, !key.isEmpty,
+              // Excluded apps are deliberately left where macOS opens them.
+              !LayoutStore.shared.isExcluded(bundleID),
               let saved = LayoutStore.shared.record(for: key)?.windows.filter({ $0.appBundleID == bundleID }),
               !saved.isEmpty else { return }
         Log.write("APP LAUNCHED → \(name): placing \(saved.count) saved window(s)")

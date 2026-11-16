@@ -50,6 +50,24 @@ struct MonitorSetRecord: Codable, Identifiable {
 /// Top-level persisted document.
 struct LayoutStoreData: Codable {
     var monitorSets: [String: MonitorSetRecord] = [:]
+    /// Bundle IDs the user has excluded: their windows are still remembered, but Monitor Glue
+    /// never moves them. Global rather than per monitor set — "leave this app alone" is a
+    /// statement about the app, not about one desk.
+    var excludedApps: [String] = []
+
+    init(monitorSets: [String: MonitorSetRecord] = [:], excludedApps: [String] = []) {
+        self.monitorSets = monitorSets
+        self.excludedApps = excludedApps
+    }
+
+    /// Hand-written so a document written by an older version — which has no `excludedApps` —
+    /// still decodes. (Synthesized decoding ignores property defaults and would throw
+    /// `keyNotFound`, which `LayoutStore.load` turns into "no layouts at all".)
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        monitorSets = (try? c.decode([String: MonitorSetRecord].self, forKey: .monitorSets)) ?? [:]
+        excludedApps = (try? c.decode([String].self, forKey: .excludedApps)) ?? []
+    }
 }
 
 // MARK: - Store
@@ -198,5 +216,32 @@ final class LayoutStore {
             data.monitorSets[setKey] = record
         }
         save()
+    }
+
+    // MARK: - Exclusion list
+
+    /// Apps whose position is recorded but never restored. Capture keeps running for them, so
+    /// taking an app off the list gives it back the position it had while it was excluded.
+    func excludedApps() -> Set<String> {
+        queue.sync { Set(data.excludedApps) }
+    }
+
+    func isExcluded(_ bundleID: String) -> Bool {
+        queue.sync { data.excludedApps.contains(bundleID) }
+    }
+
+    /// Add to / remove from the exclusion list. Persisted immediately: the list is a user
+    /// decision, and the restore path reads it back from disk every pass.
+    func setExcluded(_ excluded: Bool, for bundleID: String) {
+        guard !bundleID.isEmpty else { return }
+        queue.sync {
+            var list = Set(data.excludedApps)
+            if excluded { list.insert(bundleID) } else { list.remove(bundleID) }
+            data.excludedApps = list.sorted()
+        }
+        save()
+        Log.write(excluded
+                  ? "excluded \(bundleID) — still recording its position, never moving it"
+                  : "included \(bundleID) again — its saved position will be restored")
     }
 }

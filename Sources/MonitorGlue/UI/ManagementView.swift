@@ -191,6 +191,7 @@ private struct SetCard: View {
         -> some View {
         let appKey = "\(set.key)#\(app.bundleID)"
         let open = expandedApps.contains(appKey)
+        let excluded = LayoutStore.shared.isExcluded(app.bundleID)
         return VStack(spacing: 0) {
             Button {
                 toggle(&expandedApps, appKey)
@@ -201,10 +202,22 @@ private struct SetCard: View {
                         .foregroundStyle(.secondary)
                         .rotationEffect(.degrees(open ? 90 : 0))
                     AppIconTile(bundleID: app.bundleID, appName: app.name, size: 22)
+                    // Excluded: still remembered, but its windows are never moved. Clicking the
+                    // badge puts it back under automatic control.
+                    if excluded {
+                        ExclusionBadge(help: "Excluded — this app's position is remembered but never restored. Click to include it again.") {
+                            LayoutStore.shared.setExcluded(false, for: app.bundleID)
+                            onChange()
+                        }
+                    }
                     Text(app.name).font(.system(size: 13, weight: .medium))
                     Spacer()
                     Text("\(app.windows.count)").font(.system(size: 11.5)).foregroundStyle(.secondary)
-                    DeleteButton(icon: MGIcon.trash, help: "Forget this app in this layout") {
+                    // Not in the context menu: the exclusion list is the menu's business, and
+                    // forgetting only sticks for an app that is closed — capture re-saves the
+                    // windows of a running app seconds later.
+                    DeleteButton(icon: MGIcon.trash,
+                                 help: "Forget this app's saved windows in this layout (only sticks while the app is closed)") {
                         LayoutStore.shared.deleteApp(setKey: set.key, bundleID: app.bundleID); onChange()
                     }
                 }
@@ -212,6 +225,19 @@ private struct SetCard: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .contextMenu {
+                if excluded {
+                    Button("Include Again") {
+                        LayoutStore.shared.setExcluded(false, for: app.bundleID)
+                        onChange()
+                    }
+                } else {
+                    Button("Add to Exclusion List") {
+                        LayoutStore.shared.setExcluded(true, for: app.bundleID)
+                        onChange()
+                    }
+                }
+            }
 
             if open {
                 ForEach(app.windows) { win in windowRow(win) }
@@ -233,7 +259,8 @@ private struct SetCard: View {
             Text(verbatim: "\(Int(win.x)), \(Int(win.y))  ·  \(Int(win.width))×\(Int(win.height))")
                 .font(.system(size: 11, design: .monospaced))
                 .foregroundStyle(.tertiary)
-            DeleteButton(icon: MGIcon.xCircle, help: "Forget this window") {
+            DeleteButton(icon: MGIcon.xCircle,
+                         help: "Forget this window's saved place (only sticks while the app is closed)") {
                 LayoutStore.shared.deleteWindow(setKey: set.key, windowID: win.id); onChange()
             }
         }
@@ -244,6 +271,40 @@ private struct SetCard: View {
         withAnimation(.easeInOut(duration: 0.15)) {
             if set.contains(key) { set.remove(key) } else { set.insert(key) }
         }
+    }
+}
+
+/// Small red cross shown after an excluded app's icon. Reads as a status marker, not another
+/// row action, and clicking it takes the app off the exclusion list.
+private struct ExclusionBadge: View {
+    let help: String
+    var size: CGFloat = 12
+    let action: () -> Void
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: action) {
+            ZStack {
+                Circle().fill(Theme.red)
+                // Drawn, not an SF Symbol: "xmark"'s alignment box is taller than its glyph, so at
+                // 12pt it sits visibly off-centre (and not even square) inside a fixed circle.
+                // Geometry here is exact — equal margins on all four sides.
+                Path { p in
+                    let inset = size * 0.30
+                    p.move(to: CGPoint(x: inset, y: inset))
+                    p.addLine(to: CGPoint(x: size - inset, y: size - inset))
+                    p.move(to: CGPoint(x: size - inset, y: inset))
+                    p.addLine(to: CGPoint(x: inset, y: size - inset))
+                }
+                .stroke(.white, style: StrokeStyle(lineWidth: size * 0.15, lineCap: .round))
+            }
+            .frame(width: size, height: size)
+            .scaleEffect(hovering ? 1.15 : 1)
+            .animation(.easeOut(duration: 0.12), value: hovering)
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+        .help(help)
     }
 }
 
