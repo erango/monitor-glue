@@ -14,6 +14,7 @@ enum DebugPreview {
         guard let what = requested else { return }
         if what == "glyph" { dumpMenuBarGlyph(); return }
         if what == "diag" { diag(); return }
+        if what == "decodetest" { decodeTest(); return }
         if what == "sandboxprobe" { sandboxProbe(); return }
         if what == "bugurl" {
             let url = BugReport.previewURL()
@@ -170,7 +171,10 @@ enum DebugPreview {
                 win("com.apple.Terminal", "Terminal", "UUID-HOME", "swift build", 0, 2600, 1100, 1200, 700),
             ]
         )
-        LayoutStore.shared.injectForPreview(LayoutStoreData(monitorSets: [setA.key: setA, setB.key: setB]))
+        LayoutStore.shared.injectForPreview(LayoutStoreData(
+            monitorSets: [setA.key: setA, setB.key: setB],
+            excludedApps: ["com.tinyspeck.slackmacgap"]   // one app showing the exclusion badge
+        ))
     }
 
     private static func showManager() {
@@ -184,6 +188,29 @@ enum DebugPreview {
         win.styleMask = [.titled, .closable, .resizable, .fullSizeContentView]
         win.titlebarAppearsTransparent = true
         placeOnBuiltIn(win)
+    }
+
+    /// Guard the on-disk migration: a layouts.json written before the exclusion list existed has
+    /// no `excludedApps` key, and must still load rather than be discarded as unreadable — which
+    /// would silently forget every remembered window.
+    @MainActor private static func decodeTest() {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        let legacy = #"{"monitorSets":{"k":{"key":"k","displays":[],"lastSeen":"2026-01-01T00:00:00Z","windows":[]}}}"#
+        var out = ""
+        do {
+            let d = try decoder.decode(LayoutStoreData.self, from: Data(legacy.utf8))
+            out += "legacy document without excludedApps: sets=\(d.monitorSets.count) excluded=\(d.excludedApps) — decoded\n"
+        } catch {
+            out += "legacy document FAILED to decode: \(error)\n"
+        }
+        let current = LayoutStoreData(excludedApps: ["com.example.app", "com.apple.Safari"])
+        let raw = (try? encoder.encode(current)).flatMap { try? decoder.decode(LayoutStoreData.self, from: $0) }
+        out += "round trip: excluded=\(raw?.excludedApps ?? [])\n"
+        write(out)
+        NSApp.terminate(nil)
     }
 
     /// Render the menu-bar template glyph onto a white tile at menu-bar scale, then exit.

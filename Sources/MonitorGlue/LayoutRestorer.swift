@@ -60,8 +60,15 @@ enum LayoutRestorer {
         let liveByBundle = Dictionary(grouping: live, by: { $0.appBundleID })
         // Only restore to displays that are actually present now, keyed by UUID.
         let displaysByUUID = Dictionary(uniqueKeysWithValues: displays.map { ($0.uuid, $0) })
+        // Apps the user excluded: recorded, never moved. Filtered out before matching, which
+        // also keeps them out of the "missing window" count — otherwise an excluded app that is
+        // closed would hold every restore cycle open for its full retry window.
+        let excluded = LayoutStore.shared.excludedApps()
+        let excludedWindowCount = record.windows.filter { excluded.contains($0.appBundleID) }.count
 
-        let restorable = record.windows.filter { displaysByUUID[$0.displayUUID] != nil }
+        let restorable = record.windows.filter {
+            displaysByUUID[$0.displayUUID] != nil && !excluded.contains($0.appBundleID)
+        }
         let assignment = LayoutMatcher.match(restorable, to: live)
 
         // Retry passes are usually no-ops; log those as one line so real events stay visible.
@@ -142,7 +149,7 @@ enum LayoutRestorer {
         if details.isEmpty {
             Log.write("restore '\(record.label)': nothing to do — \(alreadyInPlace)/\(restorable.count) already in place")
         } else {
-            Log.write("restore '\(record.label)': \(record.windows.count) saved, \(restorable.count) on present displays, \(assignment.count) matched, \(alreadyInPlace) already in place; AX reported \(live.count) window(s) across \(liveByBundle.count) app(s)")
+            Log.write("restore '\(record.label)': \(record.windows.count) saved, \(restorable.count) on present displays\(excludedWindowCount > 0 ? " (\(excludedWindowCount) left alone on the exclusion list)" : ""), \(assignment.count) matched, \(alreadyInPlace) already in place; AX reported \(live.count) window(s) across \(liveByBundle.count) app(s)")
             details.forEach { Log.write($0) }
             Log.write("restore done: \(moved)/\(restorable.count) placed\(missing > 0 ? ", \(missing) still missing" : "")")
         }
@@ -175,6 +182,8 @@ enum LayoutRestorer {
     /// moving it yourself right after launch sticks.
     static func restoreApp(_ bundleID: String, setKey: String, progress: inout LaunchProgress) {
         progress.waiting = 0
+        // Excluded apps open wherever macOS puts them, and that is fine.
+        guard !LayoutStore.shared.isExcluded(bundleID) else { return }
         guard AXIsProcessTrusted(), let record = LayoutStore.shared.record(for: setKey) else { return }
         let displays = DisplayInfo.liveDisplays()
         let displaysByUUID = Dictionary(uniqueKeysWithValues: displays.map { ($0.uuid, $0) })
