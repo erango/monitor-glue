@@ -202,19 +202,20 @@ private struct SetCard: View {
                         .foregroundStyle(.secondary)
                         .rotationEffect(.degrees(open ? 90 : 0))
                     AppIconTile(bundleID: app.bundleID, appName: app.name, size: 22)
-                    // Excluded: still remembered, but its windows are never moved. Clicking the
-                    // badge puts it back under automatic control.
-                    if excluded {
-                        ExclusionBadge(help: "Excluded — this app's position is remembered but never restored. Click to include it again.") {
-                            LayoutStore.shared.setExcluded(false, for: app.bundleID)
-                            onChange()
-                        }
-                    }
                     Text(app.name).font(.system(size: 13, weight: .medium))
                     Spacer()
+                    // Excluded: still remembered, but its windows are never moved. A quiet tag
+                    // like "Laptop screen" - a status, not a control; the context menu toggles it.
+                    if excluded {
+                        Text("Not moved")
+                            .font(.system(size: 11)).foregroundStyle(.secondary)
+                            .padding(.horizontal, 6).padding(.vertical, 1)
+                            .background(RoundedRectangle(cornerRadius: 5, style: .continuous)
+                                .fill(Color.primary.opacity(0.06)))
+                            .help("Monitor Glue remembers where this app's windows are but never moves them. Right-click to change.")
+                    }
                     Text("\(app.windows.count)").font(.system(size: 11.5)).foregroundStyle(.secondary)
-                    // Not in the context menu: the exclusion list is the menu's business, and
-                    // forgetting only sticks for an app that is closed — capture re-saves the
+                    // Forgetting only sticks for an app that is closed: capture re-saves the
                     // windows of a running app seconds later.
                     DeleteButton(icon: MGIcon.trash,
                                  help: "Forget this app's saved windows in this layout (only sticks while the app is closed)") {
@@ -226,16 +227,13 @@ private struct SetCard: View {
             }
             .buttonStyle(.plain)
             .contextMenu {
-                if excluded {
-                    Button("Include Again") {
-                        LayoutStore.shared.setExcluded(false, for: app.bundleID)
-                        onChange()
-                    }
-                } else {
-                    Button("Add to Exclusion List") {
-                        LayoutStore.shared.setExcluded(true, for: app.bundleID)
-                        onChange()
-                    }
+                // One label that never changes, checked when on: the usual macOS toggle.
+                Toggle("Don't Move Windows", isOn: Binding(
+                    get: { excluded },
+                    set: { LayoutStore.shared.setExcluded($0, for: app.bundleID); onChange() }))
+                Divider()
+                Button("Forget App in This Layout") {
+                    LayoutStore.shared.deleteApp(setKey: set.key, bundleID: app.bundleID); onChange()
                 }
             }
 
@@ -271,40 +269,6 @@ private struct SetCard: View {
         withAnimation(.easeInOut(duration: 0.15)) {
             if set.contains(key) { set.remove(key) } else { set.insert(key) }
         }
-    }
-}
-
-/// Small red cross shown after an excluded app's icon. Reads as a status marker, not another
-/// row action, and clicking it takes the app off the exclusion list.
-private struct ExclusionBadge: View {
-    let help: String
-    var size: CGFloat = 12
-    let action: () -> Void
-    @State private var hovering = false
-
-    var body: some View {
-        Button(action: action) {
-            ZStack {
-                Circle().fill(Theme.red)
-                // Drawn, not an SF Symbol: "xmark"'s alignment box is taller than its glyph, so at
-                // 12pt it sits visibly off-centre (and not even square) inside a fixed circle.
-                // Geometry here is exact — equal margins on all four sides.
-                Path { p in
-                    let inset = size * 0.30
-                    p.move(to: CGPoint(x: inset, y: inset))
-                    p.addLine(to: CGPoint(x: size - inset, y: size - inset))
-                    p.move(to: CGPoint(x: size - inset, y: inset))
-                    p.addLine(to: CGPoint(x: inset, y: size - inset))
-                }
-                .stroke(.white, style: StrokeStyle(lineWidth: size * 0.15, lineCap: .round))
-            }
-            .frame(width: size, height: size)
-            .scaleEffect(hovering ? 1.15 : 1)
-            .animation(.easeOut(duration: 0.12), value: hovering)
-        }
-        .buttonStyle(.plain)
-        .onHover { hovering = $0 }
-        .help(help)
     }
 }
 

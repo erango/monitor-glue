@@ -36,9 +36,9 @@ puts them back — right monitor, right position, right size — the moment you 
   moment you unlock.
 - **Respects your changes.** Resize a window on the monitor and that becomes its new place.
   Drag a window to the laptop screen and it stays there — it won't be yanked back.
-- **Leaves the apps you name alone.** Right-click an app in the manager to add it to the
-  exclusion list. Its position is still remembered, but it is never moved — and clicking the
-  red cross beside its icon puts it back under automatic control.
+- **Leaves the apps you name alone.** Right-click an app in the manager and choose
+  **Don't Move Windows**. Its position is still remembered, but its windows are never moved;
+  choose it again to hand the app back.
 - **Copes with stubborn apps.** Some apps refuse certain sizes (Slack has a minimum width);
   Monitor Glue takes what the app allows instead of fighting it.
 - **Stays out of the way.** A menu-bar app with no Dock icon. A manager window shows every
@@ -113,8 +113,8 @@ windows — never their contents. Everything else stays on your Mac:
 Needs Swift 5.9+ (the Xcode Command Line Tools are enough).
 
 ```bash
-./Scripts/make_cert.sh        # once: a stable local signing identity (see below)
-./Scripts/bundle.sh           # builds dist/MonitorGlue.app
+./Scripts/make_cert.sh    # once: a stable local signing identity (see below)
+./Scripts/bundle.sh       # builds dist/MonitorGlue.app
 open dist/MonitorGlue.app
 ```
 

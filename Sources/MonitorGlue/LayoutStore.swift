@@ -65,8 +65,9 @@ struct LayoutStoreData: Codable {
     /// `keyNotFound`, which `LayoutStore.load` turns into "no layouts at all".)
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        monitorSets = (try? c.decode([String: MonitorSetRecord].self, forKey: .monitorSets)) ?? [:]
-        excludedApps = (try? c.decode([String].self, forKey: .excludedApps)) ?? []
+        // A damaged layouts file must fail to decode, not quietly read as "no layouts".
+        monitorSets = try c.decode([String: MonitorSetRecord].self, forKey: .monitorSets)
+        excludedApps = try c.decodeIfPresent([String].self, forKey: .excludedApps) ?? []
     }
 }
 
@@ -96,7 +97,17 @@ final class LayoutStore {
         guard let raw = try? Data(contentsOf: url) else { return LayoutStoreData() }
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
-        var loaded = (try? decoder.decode(LayoutStoreData.self, from: raw)) ?? LayoutStoreData()
+        var loaded: LayoutStoreData
+        do {
+            loaded = try decoder.decode(LayoutStoreData.self, from: raw)
+        } catch {
+            // Starting empty would overwrite the file on the next save; keep a copy to recover from.
+            let backup = url.deletingPathExtension()
+                .appendingPathExtension("unreadable-\(Int(Date().timeIntervalSince1970)).json")
+            try? FileManager.default.copyItem(at: url, to: backup)
+            Log.write("layouts file could not be read (\(error)); starting empty, kept a copy at \(backup.lastPathComponent)")
+            loaded = LayoutStoreData()
+        }
         for (key, record) in loaded.monitorSets { loaded.monitorSets[key] = pruned(record) }
         return loaded
     }
@@ -231,7 +242,7 @@ final class LayoutStore {
     }
 
     /// Add to / remove from the exclusion list. Persisted immediately: the list is a user
-    /// decision, and the restore path reads it back from disk every pass.
+    /// decision, and losing it to a crash before the next save would undo it.
     func setExcluded(_ excluded: Bool, for bundleID: String) {
         guard !bundleID.isEmpty else { return }
         queue.sync {
